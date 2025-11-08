@@ -1,0 +1,14 @@
+wandb
+gridsearch
+configs*
+*__pycache__*
+*ipynb_checkpoints*
+__pycache__/utils.cpython-312.pyc
+model/*
+figures/*
+gridsearch_kan/*
+*.out
+*.json
+Results*
+*.json
+datasets*

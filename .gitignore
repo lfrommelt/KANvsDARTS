@@ -11,4 +11,5 @@ gridsearch_kan/*
 *.json
 Results*
 *.json
-datasets*
+datasets/*
+test*

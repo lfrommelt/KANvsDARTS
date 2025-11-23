@@ -1,7 +1,8 @@
 import json
 from tqdm import tqdm
 import itertools
-#from equation_tree import instantiate_constants
+
+# from equation_tree import instantiate_constants
 import numpy as np
 import torch
 import os
@@ -15,58 +16,53 @@ import random
 import types
 import matplotlib as mpl
 
-print(sklearn)
-print(sklearn.__file__)
-print(sklearn.metrics)
-'''sys.path.append(os.path.normpath(os.getcwd() + "/pykan"))
-sys.path.append(os.path.normpath(os.getcwd() + "/autora-theorist-darts/src"))
-from kan import KAN
-import pandas as pd'''
 
 import sympy as sp
+
 
 def sample_and_replace(text: str, seed: int) -> str:
     """
     Replaces exactly one plus sign ('+') in `text` with an asterisk ('*').
-    
+
     The index of the plus sign to be replaced is drawn from a categorical
-    (discrete) uniform distribution over 0 … (n_plus-1), where n_plus is the 
+    (discrete) uniform distribution over 0 … (n_plus-1), where n_plus is the
     number of plus signs in the input.  The PRNG is initialised with `seed`
     so results are reproducible.
-    
+
     Parameters
     ----------
     seed : int
         Seed for NumPy’s random number generator.
     text : str
         Any string that contains one or more '+' characters.
-    
+
     Returns
     -------
     str
         A copy of `text` in which exactly one '+' has been changed to '*'.
         If `text` contains no '+', the original string is returned unchanged.
     """
-    
+
     # Locate every '+' in the string
-    plus_positions = [idx for idx, char in enumerate(text) if char == '+']
-    
+    plus_positions = [idx for idx, char in enumerate(text) if char == "+"]
+
     # Nothing to replace
     if not plus_positions:
         return text
-    
+
     n_plus = len(plus_positions)
-    
+
     # Uniform categorical distribution over {0, …, n_plus-1}
     rng = np.random.default_rng(seed)
     chosen = rng.choice(np.arange(n_plus))
-    
+
     # Replace the chosen '+' with '*'
     text_list = list(text)
-    text_list[plus_positions[chosen]] = '*'
-    
-    return ''.join(text_list)
-    
+    text_list[plus_positions[chosen]] = "*"
+
+    return "".join(text_list)
+
+
 def wrap_expression(expr, seed):
     values = np.linspace(0.01, 2.00, 200)
     rng = np.random.Generator(np.random.PCG64(seed))
@@ -84,161 +80,186 @@ def wrap_expression(expr, seed):
         return f"({c:.2f}*{var} + {b:.2f})"
 
     # Step 1: Insert coefficient before 'f'
-    expr = re.sub(r'f', insert_f_coefficient, expr)
+    expr = re.sub(r"f", insert_f_coefficient, expr)
 
     # Step 2: Insert bias after ')'
-    expr = re.sub(r'$', insert_bias_after_paren, expr)
+    expr = re.sub(r"$", insert_bias_after_paren, expr)
 
     # Step 3: Wrap affine transform around indexed variables
-    expr = re.sub(r'x_\d+', wrap_x, expr)
+    expr = re.sub(r"x_\d+", wrap_x, expr)
 
     return expr
-    
+
+
 def testplot(model, datasets, name, metric="nrmse", metric_norm="range", x_axis=0):
-    
-    if metric=="rmse":
-        eval_=rmse
-    elif metric=="r2":
-        eval_=r2
-    elif metric=="nrmse":
-        eval_=nrmse
-    elif metric=="rmspe":
-        eval_=rmspe
-    elif metric=="sl_rmse":
-        eval_=sl_rmse
-    fig, axes = plt.subplots(1, 1, figsize=(15,4), sharey=True)
-    ax=axes
+
+    if metric == "rmse":
+        eval_ = rmse
+    elif metric == "r2":
+        eval_ = r2
+    elif metric == "nrmse":
+        eval_ = nrmse
+    elif metric == "rmspe":
+        eval_ = rmspe
+    elif metric == "sl_rmse":
+        eval_ = sl_rmse
+    fig, axes = plt.subplots(1, 1, figsize=(15, 4), sharey=True)
+    ax = axes
     # plot prediction curve
-    #y_true = gt(x_plot)
-    
+    # y_true = gt(x_plot)
 
     # scatter data
     for label, xx, yy in datasets:
-        #print(xx[:10])
-        #print(label)
-        if label=="train":
-            m, c = 'o', 'C0'
+        # print(xx[:10])
+        # print(label)
+        if label == "train":
+            m, c = "o", "C0"
             # shade training domain
-            ax.axvspan(xx.min(), xx.max(), color='gray', alpha=0.2)
+            ax.axvspan(xx.min(), xx.max(), color="gray", alpha=0.2)
         elif "inter" in label:
-            m, c = 's', 'C1'
+            m, c = "s", "C1"
         elif "extra" in label:
-            m, c = '*', 'C2'
-            '''elif "pred" in label:
-            m, c = '+', 'C3'''
+            m, c = "*", "C2"
+            """elif "pred" in label:
+            m, c = '+', 'C3"""
         else:
             print(label)
             sgdsag
-        ax.scatter(xx[:,x_axis], yy, marker=m, c=c, label=label)
+        ax.scatter(xx[:, x_axis], yy, marker=m, c=c, label=label)
 
-    allx=np.concatenate([datasets[i][1] for i in range(3)], axis=0)
-    
-    #print(*[datasets[i][2][:5] for i in range(3)], sep="\n")
-    ally=np.concatenate([datasets[i][2] for i in range(3)], axis=0)
-    
-    #print(model(allx))
-    #ax.plot(allx, ally, 'k-', lw=1, label="gt")
-    ax.scatter(allx[:,x_axis], model(allx), lw=1, label="prediction", marker="+",c="C3")
-    
-    
+    allx = np.concatenate([datasets[i][1] for i in range(3)], axis=0)
+
+    # print(*[datasets[i][2][:5] for i in range(3)], sep="\n")
+    ally = np.concatenate([datasets[i][2] for i in range(3)], axis=0)
+
+    # print(model(allx))
+    # ax.plot(allx, ally, 'k-', lw=1, label="gt")
+    ax.scatter(
+        allx[:, x_axis], model(allx), lw=1, label="prediction", marker="+", c="C3"
+    )
+
     # compute & display RMSEs
     txt = ""
     for lbl, xx, yy in datasets:
-        #print(lbl)
+        # print(lbl)
         r = eval_(yy, model(xx), norm=metric_norm)
-        #print("----")
+        # print("----")
         txt += f"{lbl[:5]} {metric}={r:.3f}\n"
-    ax.text(0.05, 0.95, txt, transform=ax.transAxes,
-            va='top', ha='left', fontsize=9,
-            bbox=dict(boxstyle="round,pad=0.3", alpha=0.1))
+    ax.text(
+        0.05,
+        0.95,
+        txt,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=9,
+        bbox=dict(boxstyle="round,pad=0.3", alpha=0.1),
+    )
 
     ax.set_title(name)
-    ax.set_xlim(-10,10)
+    ax.set_xlim(-10, 10)
     ax.set_xlabel("x")
     ax.set_ylabel("f(x)")
-    ax.legend(loc='lower right', fontsize=8)
+    ax.legend(loc="lower right", fontsize=8)
     plt.tight_layout()
     plt.show()
-    
-    
-def testplot2(model, datasets, name, metric="nrmse", metric_norm="range", x_axis=0, s=72, f2=32):
-    
-    mpl.rcParams.update({'font.size': 32})
-    
-    if metric=="rmse":
-        eval_=rmse
-    elif metric=="r2":
-        eval_=r2
-    elif metric=="nrmse":
-        eval_=nrmse
-    elif metric=="rmspe":
-        eval_=rmspe
-    elif metric=="sl_rmse":
-        eval_=sl_rmse
-    fig, axes = plt.subplots(1, 1, figsize=(30,8), sharey=True)
-    ax=axes
+
+
+def testplot2(
+    model, datasets, name, metric="nrmse", metric_norm="range", x_axis=0, s=72, f2=32
+):
+
+    mpl.rcParams.update({"font.size": 32})
+
+    if metric == "rmse":
+        eval_ = rmse
+    elif metric == "r2":
+        eval_ = r2
+    elif metric == "nrmse":
+        eval_ = nrmse
+    elif metric == "rmspe":
+        eval_ = rmspe
+    elif metric == "sl_rmse":
+        eval_ = sl_rmse
+    fig, axes = plt.subplots(1, 1, figsize=(30, 8), sharey=True)
+    ax = axes
     # plot prediction curve
-    #y_true = gt(x_plot)
-    
+    # y_true = gt(x_plot)
 
     # scatter data
     for label, xx, yy in datasets:
-        #print(xx[:10])
-        #print(label)
-        if label=="train":
-            m, c = 'o', 'C0'
+        # print(xx[:10])
+        # print(label)
+        if label == "train":
+            m, c = "o", "C0"
             # shade training domain
-            ax.axvspan(xx.min(), xx.max(), color='gray', alpha=0.2)
+            ax.axvspan(xx.min(), xx.max(), color="gray", alpha=0.2)
         elif "inter" in label:
-            m, c = 's', 'C1'
+            m, c = "s", "C1"
         elif "extra" in label:
-            m, c = '*', 'C2'
-            '''elif "pred" in label:
-            m, c = '+', 'C3'''
+            m, c = "*", "C2"
+            """elif "pred" in label:
+            m, c = '+', 'C3"""
         else:
             print(label)
             sgdsag
-        ax.scatter(xx[:,x_axis], yy, marker=m, c=c, label=label, s=s)
+        ax.scatter(xx[:, x_axis], yy, marker=m, c=c, label=label, s=s)
 
-    allx=np.concatenate([datasets[i][1] for i in range(3)], axis=0)
-    
-    #print(*[datasets[i][2][:5] for i in range(3)], sep="\n")
-    ally=np.concatenate([datasets[i][2] for i in range(3)], axis=0)
-    
-    #print(model(allx))
-    #ax.plot(allx, ally, 'k-', lw=1, label="gt")
-    ax.scatter(allx[:,x_axis], model(allx), lw=1, label="prediction", marker="+",c="C3", s=s*1.2)
-    
-    
+    allx = np.concatenate([datasets[i][1] for i in range(3)], axis=0)
+
+    # print(*[datasets[i][2][:5] for i in range(3)], sep="\n")
+    ally = np.concatenate([datasets[i][2] for i in range(3)], axis=0)
+
+    # print(model(allx))
+    # ax.plot(allx, ally, 'k-', lw=1, label="gt")
+    ax.scatter(
+        allx[:, x_axis],
+        model(allx),
+        lw=1,
+        label="prediction",
+        marker="+",
+        c="C3",
+        s=s * 1.2,
+    )
+
     # compute & display RMSEs
     txt = ""
     for lbl, xx, yy in datasets:
-        #print(lbl)
+        # print(lbl)
         r = eval_(yy, model(xx), norm=metric_norm)
-        #print("----")
+        # print("----")
         txt += f"{lbl[:5]} {metric}={r:.3f}\n"
-    ax.text(0.05, 0.95, txt, transform=ax.transAxes,
-            va='top', ha='left', fontsize=f2,
-            bbox=dict(boxstyle="round,pad=0.3", alpha=0.1))
+    ax.text(
+        0.05,
+        0.95,
+        txt,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=f2,
+        bbox=dict(boxstyle="round,pad=0.3", alpha=0.1),
+    )
 
-    #ax.set_title(name)
-    #ax.set_xlim(-10,10)
+    # ax.set_title(name)
+    # ax.set_xlim(-10,10)
     ax.set_xlabel(f"x_{x_axis+1}")
     ax.set_ylabel("f(x)")
-    ax.legend(loc='lower right')#, fontsize=8)
+    ax.legend(loc="lower right")  # , fontsize=8)
     plt.tight_layout()
     plt.show()
-    
-    
+
+
 class SamplingError(ValueError):
     """Raised when a sampling procedure fails or produces invalid data."""
+
     pass
+
 
 def round_and_simplify(expr, ndigits=1):
     """
     Round all Float numbers occurring in `expr` to *ndigits* decimals and
     return a simplified expression (0*anything → 0, etc.).
-    
+
     Parameters
     ----------
     expr : str | sympy.Expr
@@ -250,12 +271,12 @@ def round_and_simplify(expr, ndigits=1):
     -------
     sympy.Expr
     """
-    #expr = sympify(expr)                # ensure we have a SymPy expression
+    # expr = sympify(expr)                # ensure we have a SymPy expression
 
     def _round_float(f):
         """Round one sympy.Float instance to ndigits decimals."""
-        v = round(float(f), ndigits)    # Python float → rounded
-        if abs(v) < 10**(-ndigits):     # get rid of -0.0 / tiny remainders
+        v = round(float(f), ndigits)  # Python float → rounded
+        if abs(v) < 10 ** (-ndigits):  # get rid of -0.0 / tiny remainders
             v = 0
         return sp.Float(v)
 
@@ -265,7 +286,8 @@ def round_and_simplify(expr, ndigits=1):
     # final clean-up
     return simplify(rounded)
 
-x_1, x_2, x_3 = sp.symbols('x_1 x_2 x_3')
+
+x_1, x_2, x_3 = sp.symbols("x_1 x_2 x_3")
 _ALLOWED = [x_1, x_2, x_3]
 
 '''def make_vectorized(expr, inputs=None):
@@ -329,6 +351,7 @@ _ALLOWED = [x_1, x_2, x_3]
 
     return f'''
 
+
 def make_vectorized(expr, inputs=None):
     """
     expr    : a SymPy expression or a bare Python int/float
@@ -358,13 +381,13 @@ def make_vectorized(expr, inputs=None):
     if n_in > 3:
         raise ValueError("Can't have more than 3 input symbols")
 
-    '''# 2) ensure expr mentions only those inputs
+    """# 2) ensure expr mentions only those inputs
     extra = expr.free_symbols - set(inputs)
     if extra:
-        raise ValueError(f"Expression uses symbols {extra} not in inputs")'''
+        raise ValueError(f"Expression uses symbols {extra} not in inputs")"""
 
     # 3) lambdify to a numpy‐aware function
-    f_np = sp.lambdify(inputs, expr, modules='numpy')
+    f_np = sp.lambdify(inputs, expr, modules="numpy")
 
     # 4) wrap so that we feed it columns of X
     def f(X):
@@ -382,17 +405,19 @@ def make_vectorized(expr, inputs=None):
 
         if np.isscalar(out) or (isinstance(out, np.ndarray) and out.ndim == 0):
             return np.full(n_pts, out, dtype=float)
-        #print(out)
+        # print(out)
         return np.asarray(out)
 
     return f
 
-def rmse(y_true, y_pred, norm=None):
-    y_true_=y_true[~np.isnan(y_pred)]
-    y_pred_=y_pred[~np.isnan(y_pred)]
-    return np.sqrt(np.mean((y_true_ - y_pred_)**2))
 
-def nrmse(y_true, y_pred, norm='range'):
+def rmse(y_true, y_pred, norm=None):
+    y_true_ = y_true[~np.isnan(y_pred)]
+    y_pred_ = y_pred[~np.isnan(y_pred)]
+    return np.sqrt(np.mean((y_true_ - y_pred_) ** 2))
+
+
+def nrmse(y_true, y_pred, norm="range"):
     """
     Normalised root-mean-square error (scale-invariant).
 
@@ -403,8 +428,8 @@ def nrmse(y_true, y_pred, norm='range'):
     y_pred : array-like
         Predicted target values (may contain NaNs).
     norm : {'range', 'mean', 'std'}, default 'range'
-        • 'range' → divide by (max - min) of y_true  
-        • 'mean'  → divide by mean(y_true)  (CV-RMSE)  
+        • 'range' → divide by (max - min) of y_true
+        • 'mean'  → divide by mean(y_true)  (CV-RMSE)
         • 'std'   → divide by std(y_true)
 
     Returns
@@ -413,43 +438,43 @@ def nrmse(y_true, y_pred, norm='range'):
         The normalised RMSE.  np.nan if it cannot be computed.
     """
     # mask out the entries whose prediction is NaN
-    mask = (~np.isnan(y_pred))&(~np.isnan(y_true))
-    y_t  = np.asarray(y_true)[mask]
-    y_p  = np.asarray(y_pred)[mask]
+    mask = (~np.isnan(y_pred)) & (~np.isnan(y_true))
+    y_t = np.asarray(y_true)[mask]
+    y_p = np.asarray(y_pred)[mask]
 
     print(y_t.shape)
     print(y_p.shape)
-    
+
     if y_t.size == 0:
-        return np.nan          # nothing to evaluate
+        return np.nan  # nothing to evaluate
 
     rmse = np.sqrt(np.mean((y_t - y_p) ** 2))
 
-    if norm == 'range':
+    if norm == "range":
         denom = y_t.max() - y_t.min()
-    elif norm == 'mean':
+    elif norm == "mean":
         denom = np.abs(np.mean(y_t))
-    elif norm == 'std':
+    elif norm == "std":
         denom = np.std(y_t, ddof=0)
     else:
         raise ValueError("norm must be 'range', 'mean', or 'std'")
 
     if denom == 0:
-        return np.nan          # scale is zero → undefined
+        return np.nan  # scale is zero → undefined
 
     return rmse / denom
 
 
-def sl_rmse_old(y_true, y_pred, lam=1.0, eps=1e-12, norm=None):  
-    mask = (~np.isnan(y_pred))&(~np.isnan(y_true))
-    y_true  = np.asarray(y_true)[mask]
-    y_pred  = np.asarray(y_pred)[mask]
+def sl_rmse_old(y_true, y_pred, lam=1.0, eps=1e-12, norm=None):
+    mask = (~np.isnan(y_pred)) & (~np.isnan(y_true))
+    y_true = np.asarray(y_true)[mask]
+    y_pred = np.asarray(y_pred)[mask]
 
     sign_true = np.sign(y_true)
     sign_pred = np.sign(y_pred)
 
     # protect against zeros and keep magnitudes
-    y_abs  = np.abs(y_true) + eps
+    y_abs = np.abs(y_true) + eps
     yp_abs = np.abs(y_pred) + eps
 
     # best vertical shift in log-space
@@ -466,32 +491,33 @@ def sl_rmse_old(y_true, y_pred, lam=1.0, eps=1e-12, norm=None):
 
 
 def sl_rmse(y_true, y_pred, lam=1.0, eps=1e-12, **kwargs):
-    
+
     mask = np.isfinite(y_true) & np.isfinite(y_pred)
     y_true = y_true[mask]
     y_pred = y_pred[mask]
 
     sign_err = (np.sign(y_true) != np.sign(y_pred)).astype(float)
 
-    log_y  = np.log(np.abs(y_true) + eps)
+    log_y = np.log(np.abs(y_true) + eps)
     log_yp = np.log(np.abs(y_pred) + eps)
 
-    delta  = np.mean(log_yp - log_y)          # same as before
-    err    = (log_yp - delta) - log_y         # <-- no exp() at all
+    delta = np.mean(log_yp - log_y)  # same as before
+    err = (log_yp - delta) - log_y  # <-- no exp() at all
 
     return np.sqrt(np.mean(err**2 + lam * sign_err))
 
 
 def rmspe(y_true, y_pred, norm=None, eps=1e-12):
-    
-    mask = (~np.isnan(y_pred))&(~np.isnan(y_true))
-    y_t  = np.asarray(y_true)[mask]
-    y_p  = np.asarray(y_pred)[mask]
-    
-    #y_true = np.asarray(y_true, dtype=float)
-    #y_pred = np.asarray(y_pred, dtype=float)
-    rel_sq = ((y_p - y_t) / np.maximum(np.abs(y_t), eps))**2
+
+    mask = (~np.isnan(y_pred)) & (~np.isnan(y_true))
+    y_t = np.asarray(y_true)[mask]
+    y_p = np.asarray(y_pred)[mask]
+
+    # y_true = np.asarray(y_true, dtype=float)
+    # y_pred = np.asarray(y_pred, dtype=float)
+    rel_sq = ((y_p - y_t) / np.maximum(np.abs(y_t), eps)) ** 2
     return np.sqrt(np.mean(rel_sq))
+
 
 def r2(y_true, y_pred, norm=None):
     """
@@ -512,22 +538,22 @@ def r2(y_true, y_pred, norm=None):
         predictions are NaN or `y_true` has zero variance).
     """
     # Keep only the entries whose prediction is not NaN
-    mask     = ~np.isnan(y_pred) & ~np.isnan(y_true)
-    #print(y_true)
-    #print(y_pred)
-    y_true_  = y_true[mask]
-    y_pred_  = y_pred[mask]
-    '''print(y_true_)
+    mask = ~np.isnan(y_pred) & ~np.isnan(y_true)
+    # print(y_true)
+    # print(y_pred)
+    y_true_ = y_true[mask]
+    y_pred_ = y_pred[mask]
+    """print(y_true_)
     print(y_pred_)
     print(y_true_-y_pred)
-    print(rmse(y_true_, y_pred_))'''
+    print(rmse(y_true_, y_pred_))"""
 
     # Nothing left after masking → undefined R²
     if y_true_.size == 0:
         return np.nan
 
-    ss_res = np.sum((y_true_ - y_pred_)**2)
-    ss_tot = np.sum((y_true_ - np.mean(y_true_))**2)
+    ss_res = np.sum((y_true_ - y_pred_) ** 2)
+    ss_tot = np.sum((y_true_ - np.mean(y_true_)) ** 2)
 
     # If variance is zero, R² is undefined
     if ss_tot == 0:
@@ -538,27 +564,29 @@ def r2(y_true, y_pred, norm=None):
 
 @dataclass
 class Dump:
-    latent_states=list()
-    
-'''sys.path.append(
+    latent_states = list()
+
+
+"""sys.path.append(
     os.path.dirname(os.getcwd())
     + "/merge_requests/deterministic_darts/autora-theorist-darts/src"
-)'''
-#print(sys.path)
-#from autora.theorist.darts import DARTSExecutionMonitor, DARTSRegressor
-#from autora.theorist.darts.regressor import _generate_model
+)"""
+# print(sys.path)
+# from autora.theorist.darts import DARTSExecutionMonitor, DARTSRegressor
+# from autora.theorist.darts.regressor import _generate_model
 
 # not nice, but we need all sympy symbolic functions in our namespace for eval
-#from sympy import *
+# from sympy import *
 import sympy as sp
 import re
 import sympy as sp
-#import equation_tree
-'''from equation_tree.prior import (
+
+# import equation_tree
+"""from equation_tree.prior import (
     priors_from_space,
     structure_prior_from_max_depth,
     structure_prior_from_depth,
-)'''
+)"""
 import itertools
 
 OPERATORS = {
@@ -602,104 +630,118 @@ PROBLEM_DOMAINS = {
 }
 
 PRIMITIVES = (
-        "power_two",
-        "power_three",
-        "exp",
-        "ln",
-        "reciprocal",
-        "sin",
-        )
+    "power_two",
+    "power_three",
+    "exp",
+    "ln",
+    "reciprocal",
+    "sin",
+)
+
 
 def check_success(prediction, ground_truth, v=False, levels=3):
     # check success
     # darts var name convention
-    #eq_=normalize_varnames(ground_truth)
-    eq_=str_to_sympy(ground_truth, var="x_")
-
+    # eq_=normalize_varnames(ground_truth)
+    eq_ = str_to_sympy(ground_truth, var="x_")
 
     # catch cases, where predicted_equation is just a constant
-    pred=ensure_symbolic(prediction)
+    pred = ensure_symbolic(prediction)
     # rewrite cos(x) to sin(x+pi/2)
-    pred=pred.rewrite(sp.sin)
+    pred = pred.rewrite(sp.sin)
     # evaluate with pi as float, so the previous step is not being reverted
-    pred=pred.subs(sp.pi, sp.N(sp.pi))
+    pred = pred.subs(sp.pi, sp.N(sp.pi))
     # sin(x+a) to sin(x+a%(2pi)), i.e. minimal positive additive argument
-    pred=pred.replace(
-        lambda f: f.func is sp.sin,
-        norm_sin
-    )
+    pred = pred.replace(lambda f: f.func is sp.sin, norm_sin)
     # round, expand, replace equal values by symbols, simplify, drop values below sensitivity
-    simpler_=[]
-    if levels>0:
+    simpler_ = []
+    if levels > 0:
         simpler_.append(simplify(pred, decimal_points=0, sensitivity=1e-4))
-    if levels>1:
+    if levels > 1:
         simpler_.append(simplify(pred, decimal_points=1, sensitivity=1e-4))
-    if levels>2:
+    if levels > 2:
         simpler_.append(simplify(pred, decimal_points=2, sensitivity=1e-4))
 
-    
-    eq_=unify_float_precision(eq_)
-    
-    success=False
+    eq_ = unify_float_precision(eq_)
+
+    success = False
     for simpler in simpler_:
         # 1.0*x to x
-        simpler=remove_unit_coeff(simpler)
+        simpler = remove_unit_coeff(simpler)
         # make sure that floats have the same precision so they can be truly equal
-        simpler=unify_float_precision(simpler)
+        simpler = unify_float_precision(simpler)
 
-        success=simpler.equals(eq_)
+        success = simpler.equals(eq_)
         if v:
             print(f"{simpler}=={eq_}")
             print(success)
             print()
         if success:
             break
-            
+
     if success is None:
-        success=False
+        success = False
     return success
-                                        
-                                        
+
+
 def plot_alphas_fresh(monitor, n_var):
-    alphas=monitor.alphas
+    alphas = monitor.alphas
     for node in range(len(alphas[0])):
         for input_ in range(len(alphas[0][node])):
-            node_size=len(alphas[0][node])
-            from_=f"x_{input_-node_size+n_var}" if input_>=node_size-n_var else f"h_{input_}"
-            to=f"h_{node}"
+            node_size = len(alphas[0][node])
+            from_ = (
+                f"x_{input_-node_size+n_var}"
+                if input_ >= node_size - n_var
+                else f"h_{input_}"
+            )
+            to = f"h_{node}"
             plt.title(f"{from_}->{to}")
             for i, primitive in enumerate(alphas[0][0][0].keys()):
-                plt.plot(np.arange(len(alphas)), [alphas[j][node][input_][primitive] for j in range(len(alphas))], label=str(primitive))
+                plt.plot(
+                    np.arange(len(alphas)),
+                    [alphas[j][node][input_][primitive] for j in range(len(alphas))],
+                    label=str(primitive),
+                )
             plt.legend()
             plt.show()
-            
+
 
 def plot_alphas_old(monitor, n_var, primitives):
-    alphas=monitor.alphas
-    
-    i=0
-    break_=false
+    alphas = monitor.alphas
+
+    i = 0
+    break_ = false
     while not break_:
-        i+=1
-        overall_i=0
+        i += 1
+        overall_i = 0
         for input_ in range(i):
-            node_size=i
-            from_=f"x_{input_-node_size+n_var}" if input_>=node_size-n_var else f"h_{input_}"
-            to=f"h_{i}"
+            node_size = i
+            from_ = (
+                f"x_{input_-node_size+n_var}"
+                if input_ >= node_size - n_var
+                else f"h_{input_}"
+            )
+            to = f"h_{i}"
             plt.title(f"{from_}->{to}")
             for k, primitive in enumerate(primitives):
-                plt.plot(np.arange(len(alphas)), [alphas[l][overall_i][k] for l in range(len(alphas))], label=primitive)
+                plt.plot(
+                    np.arange(len(alphas)),
+                    [alphas[l][overall_i][k] for l in range(len(alphas))],
+                    label=primitive,
+                )
             plt.legend()
             plt.show()
-            overall_i+=1
+            overall_i += 1
+
 
 def normalize_varnames(s):
-    return re.sub(r'x_(\d+)', r'x\1', s)
+    return re.sub(r"x_(\d+)", r"x\1", s)
+
 
 def plot_pair_histograms(rectangles, n):
     # Build all possible pairs
     ordered_pairs = [(i, j) for i in range(n) for j in range(n) if i != j]
-    unordered_pairs = [tuple(sorted((i, j))) for i in range(n) for j in range(i+1, n)]
+    unordered_pairs = [tuple(sorted((i, j))) for i in range(n) for j in range(i + 1, n)]
 
     # Count pairs
     unordered_counts = {p: 0 for p in unordered_pairs}
@@ -709,15 +751,15 @@ def plot_pair_histograms(rectangles, n):
         k = len(mat[0])
         for row in mat:
             # Unordered: all combos
-            '''for i, j in itertools.combinations(range(k), 2):
-                up = tuple(sorted((row[i], row[j])))
-                unordered_counts[up] += 1'''
-            for i in range(k-1):
-                up = tuple(sorted((row[i], row[i+1])))
+            """for i, j in itertools.combinations(range(k), 2):
+            up = tuple(sorted((row[i], row[j])))
+            unordered_counts[up] += 1"""
+            for i in range(k - 1):
+                up = tuple(sorted((row[i], row[i + 1])))
                 unordered_counts[up] += 1
             # Ordered: only adjacent
-            for i in range(k-1):
-                op = (row[i], row[i+1])
+            for i in range(k - 1):
+                op = (row[i], row[i + 1])
                 ordered_counts[op] += 1
 
     # Plot
@@ -745,37 +787,38 @@ def plot_pair_histograms(rectangles, n):
     plt.show()
     return pairs_labels, counts
 
+
 def replace_functions(expression, functions):
     # This will be used to track the index of function replacements
     function_index = 0
 
     def recursive_replace(s):
         nonlocal function_index
-        
+
         # To store the result expression
         result = []
         i = 0
-        
+
         while i < len(s):
-            if s[i:i+2] == 'f(':
+            if s[i : i + 2] == "f(":
                 # Find the corresponding closing parenthesis
                 open_count = 1  # Number of opening parentheses encountered
                 j = i + 2
                 while j < len(s) and open_count > 0:
-                    if s[j] == '(':
+                    if s[j] == "(":
                         open_count += 1
-                    elif s[j] == ')':
+                    elif s[j] == ")":
                         open_count -= 1
                     j += 1
-                    
+
                 # Extract the inner expression
-                inner_expression = s[i+2:j-1]
-                
+                inner_expression = s[i + 2 : j - 1]
+
                 # Apply function replacement based on current index
                 f_string = functions[function_index]
                 function_index += 1
                 replaced_inner = recursive_replace(inner_expression)
-                
+
                 if f_string == "power_two":
                     result.append(f"({replaced_inner})**2")
                 elif f_string == "power_three":
@@ -788,7 +831,7 @@ def replace_functions(expression, functions):
                     result.append(f"1/({replaced_inner})")
                 elif f_string == "sin":
                     result.append(f"sin({replaced_inner})")
-                
+
                 # Advance the current position past the closing parenthesis
                 i = j
             else:
@@ -796,12 +839,12 @@ def replace_functions(expression, functions):
                 result.append(s[i])
                 i += 1
 
-        return ''.join(result)
+        return "".join(result)
 
     return recursive_replace(expression)
 
 
-def replace_xs(expression, n_v, seed=0):    
+def replace_xs(expression, n_v, seed=0):
     random.seed(seed)
     x_vars = [f"x_{i+1}" for i in range(n_v)]
 
@@ -811,21 +854,21 @@ def replace_xs(expression, n_v, seed=0):
         bracket_count = 0
         last_cut = 0
         for i, c in enumerate(s):
-            if c == '(':
+            if c == "(":
                 if bracket_count == 0:
                     parts.append(s[last_cut:i])
                     last_cut = i + 1
                 bracket_count += 1
-            elif c == ')':
+            elif c == ")":
                 bracket_count -= 1
                 if bracket_count == 0:
                     inner_expression, inner_used = recursive_replace(s[last_cut:i])
                     parts.append(f"({inner_expression})")
                     last_cut = i + 1
-        
+
         if last_cut < len(s):
             parts.append(s[last_cut:])
-        
+
         # Shuffle a fresh copy of x_vars for the current context
         fresh_x_vars = x_vars[:]
         random.shuffle(fresh_x_vars)
@@ -833,24 +876,24 @@ def replace_xs(expression, n_v, seed=0):
         # Replace 'x' with available fresh_x_vars in the current context
         replaced_parts = []
         used_xs = []
-        
+
         for part in parts:
             if part:
                 replacements = []
-                for item in part.split('+'):
+                for item in part.split("+"):
                     item_clean = item.strip()
-                    if item_clean == 'x':
+                    if item_clean == "x":
                         if fresh_x_vars:
                             replacement = fresh_x_vars.pop()
                             replacements.append(replacement)
                             used_xs.append(replacement)
                         else:
-                            replacements.append('x')  # If running out of x_vars
+                            replacements.append("x")  # If running out of x_vars
                     else:
                         replacements.append(item_clean)
-                replaced_parts.append(' + '.join(replacements))
+                replaced_parts.append(" + ".join(replacements))
 
-        return ''.join(replaced_parts), used_xs
+        return "".join(replaced_parts), used_xs
 
     # Recursive process
     final_expression, used_xs = recursive_replace(expression)
@@ -860,22 +903,22 @@ def replace_xs(expression, n_v, seed=0):
 
     # Replace any standalone 'x' left with unused x_vars
     # should be unnecessary
-    expression_parts = final_expression.split('+')
+    expression_parts = final_expression.split("+")
     final_replacements = []
     for part in expression_parts:
         stripped_part = part.strip()
-        if stripped_part == 'x' and unused_xs:
+        if stripped_part == "x" and unused_xs:
             final_replacements.append(unused_xs.pop())
         else:
             final_replacements.append(stripped_part)
-    
-    exp = ' + '.join(final_replacements)
-    
+
+    exp = " + ".join(final_replacements)
+
     var_re = re.compile(r"x_\d+")
 
     # 1) find which vars are already used
-    found  = var_re.findall(exp)
-    used   = set(found)
+    found = var_re.findall(exp)
+    used = set(found)
     unused = list(set(x_vars) - used)
 
     # 2) for each missing var, pick a donor and overwrite one occurrence
@@ -902,97 +945,130 @@ def replace_xs(expression, n_v, seed=0):
 
     return exp
 
-def sample_structure(n=3, n_v=2, binary_probs=(1/2,1/2), ternary_probs=(1/3, 1/3, 1/3), seed=0, x_logit=1, f_logit=1, p_logit=1):
-    '''
+
+def sample_structure(
+    n=3,
+    n_v=2,
+    binary_probs=(1 / 2, 1 / 2),
+    ternary_probs=(1 / 3, 1 / 3, 1 / 3),
+    seed=0,
+    x_logit=1,
+    f_logit=1,
+    p_logit=1,
+):
+    """
     Sample from the grammar:
     S   ::= +(C0, C0) | f1(T1)
     T1  ::= x | f2(T2) | +(C1, C1)
     T2  ::= x | +(C2, C2)
     T0  ::= x | f1(T1) | +(C0, C0)
-    
+
     With additional constraints:
         - exactly n functions
         - no more than n_v variables directly inside a function or the overal expression
         - at least n_v variables in total
-        
+
     And sampling probabily distributions:
         - binary_probs for x|f or x|+ cases (due to constraints)
         - ternary_probs for x|f|+ cases
-    '''
+    """
+
     def s(n=3, n_v=2):
-        '''
+        """
         n := number of unary functions
         n_v := number of different inputs
         leaf := amount of leaves that are left, decreases per each branching
-        '''
-        if n==0:
+        """
+        if n == 0:
             return " + ".join(["x" for _ in range(n_v)])
 
         result = None
 
         while result is None:
             # left over available total leaves (bullshit, enforcing local rule, only, entails global rule in this case)
-            leaves = n_v*n
+            leaves = n_v * n
             # left over available leaves per function
-            local_leaves = n_v-1
+            local_leaves = n_v - 1
             case = random.random()
-            binary_probs=np.array([f_logit, p_logit])/(f_logit+p_logit)
+            binary_probs = np.array([f_logit, p_logit]) / (f_logit + p_logit)
             if case < binary_probs[0]:
-                n_, leaves_, result, _ = t1(n-1, leaves, n_v=n_v)
+                n_, leaves_, result, _ = t1(n - 1, leaves, n_v=n_v)
                 result = f"f({result})"
-                if n_ == 0 and (result.count("x")>=n_v):
+                if n_ == 0 and (result.count("x") >= n_v):
                     return result
                 else:
                     result = None
             else:
-                n_left, leaves_left, result_left, local_leaves = t0(n, leaves-1, local_leaves-1, n_v=n_v)
-                #print(f"t0 left yields: {result_left}")
-                n_right, leaves_right, result_right, local_leaves = t0(n_left, leaves_left, local_leaves=local_leaves, n_v=n_v)
-                #print(f"t0 right yields: {result_right}")
-                if n_right == 0 and ((result_left+result_right).count("x")>=n_v):
+                n_left, leaves_left, result_left, local_leaves = t0(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                # print(f"t0 left yields: {result_left}")
+                n_right, leaves_right, result_right, local_leaves = t0(
+                    n_left, leaves_left, local_leaves=local_leaves, n_v=n_v
+                )
+                # print(f"t0 right yields: {result_right}")
+                if n_right == 0 and ((result_left + result_right).count("x") >= n_v):
                     return f"{result_left} + {result_right}"
                 else:
                     result = None
-
 
     def t0(n, leaves, local_leaves=None, n_v=n_v):
         if local_leaves is None:
             local_leaves = n_v - 1
         case = random.random()
-        #print(f"entering t0 with local_leaves={local_leaves} and leaves={leaves}")
+        # print(f"entering t0 with local_leaves={local_leaves} and leaves={leaves}")
         if (n > 0) and (leaves > 0) and (local_leaves > 0):
-            ternary_probs=np.array([x_logit, f_logit, p_logit])/(x_logit+f_logit+p_logit)
+            ternary_probs = np.array([x_logit, f_logit, p_logit]) / (
+                x_logit + f_logit + p_logit
+            )
             if case < ternary_probs[0]:
                 return n, leaves, "x", local_leaves
             elif case < sum(ternary_probs[:2]):
-                n, leaves, result, _ = t1(n-1, leaves, n_v=n_v)
+                n, leaves, result, _ = t1(n - 1, leaves, n_v=n_v)
                 result = f"f({result})"
                 return n, leaves, result, local_leaves + 1
             else:
-                n_left, leaves_left, result_left, local_leaves = t0(n, leaves-1, local_leaves-1, n_v=n_v)
-                n_right, leaves_right, result_right, local_leaves = t0(n_left, leaves_left, local_leaves, n_v=n_v)
-                return n_right, leaves_right, f"{result_left} + {result_right}", local_leaves
+                n_left, leaves_left, result_left, local_leaves = t0(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                n_right, leaves_right, result_right, local_leaves = t0(
+                    n_left, leaves_left, local_leaves, n_v=n_v
+                )
+                return (
+                    n_right,
+                    leaves_right,
+                    f"{result_left} + {result_right}",
+                    local_leaves,
+                )
 
         elif n > 0:
-            binary_probs=np.array([x_logit, f_logit])/(x_logit+f_logit)
+            binary_probs = np.array([x_logit, f_logit]) / (x_logit + f_logit)
             if case < binary_probs[0]:
                 return n, leaves, "x", local_leaves
             else:
-                n, leaves, result, _ = t1(n-1, leaves, n_v=n_v)
+                n, leaves, result, _ = t1(n - 1, leaves, n_v=n_v)
                 result = f"f({result})"
                 return n, leaves, result, local_leaves + 1
 
         elif leaves > 0 and (local_leaves > 0):
-            binary_probs=np.array([x_logit, p_logit])/(x_logit+p_logit)
+            binary_probs = np.array([x_logit, p_logit]) / (x_logit + p_logit)
             if case < binary_probs[0]:
                 return n, leaves, "x", local_leaves
             else:
-                n_left, leaves_left, result_left, local_leaves = t0(n, leaves-1, local_leaves-1, n_v=n_v)
-                n_right, leaves_right, result_right, local_leaves = t0(n_left, leaves_left, local_leaves, n_v=n_v)
-                return n_right, leaves_right, f"{result_left} + {result_right}", local_leaves
+                n_left, leaves_left, result_left, local_leaves = t0(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                n_right, leaves_right, result_right, local_leaves = t0(
+                    n_left, leaves_left, local_leaves, n_v=n_v
+                )
+                return (
+                    n_right,
+                    leaves_right,
+                    f"{result_left} + {result_right}",
+                    local_leaves,
+                )
         else:
             return n, leaves, "x", local_leaves
-
 
     def t1(n, leaves, local_leaves=None, n_v=n_v):
         if local_leaves is None:
@@ -1001,38 +1077,57 @@ def sample_structure(n=3, n_v=2, binary_probs=(1/2,1/2), ternary_probs=(1/3, 1/3
         case = random.random()
 
         if (n > 0) and (leaves > 0) and (local_leaves > 0):
-            ternary_probs=np.array([x_logit, f_logit, p_logit])/(x_logit+f_logit+p_logit)
+            ternary_probs = np.array([x_logit, f_logit, p_logit]) / (
+                x_logit + f_logit + p_logit
+            )
             if case < ternary_probs[0]:
                 return n, leaves, "x", local_leaves
             elif case < sum(ternary_probs[:2]):
-                n, leaves, result, _ = t2(n-1, leaves, n_v=n_v)
+                n, leaves, result, _ = t2(n - 1, leaves, n_v=n_v)
                 result = f"f({result})"
                 return n, leaves, result, local_leaves + 1
             else:
-                n_left, leaves_left, result_left, local_leaves = t1(n, leaves-1, local_leaves-1, n_v=n_v)
-                n_right, leaves_right, result_right, local_leaves = t1(n_left, leaves_left, local_leaves, n_v=n_v)
-                return n_right, leaves_right, f"{result_left} + {result_right}", local_leaves
+                n_left, leaves_left, result_left, local_leaves = t1(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                n_right, leaves_right, result_right, local_leaves = t1(
+                    n_left, leaves_left, local_leaves, n_v=n_v
+                )
+                return (
+                    n_right,
+                    leaves_right,
+                    f"{result_left} + {result_right}",
+                    local_leaves,
+                )
 
         elif n > 0:
-            binary_probs=np.array([x_logit, f_logit])/(x_logit+f_logit)
+            binary_probs = np.array([x_logit, f_logit]) / (x_logit + f_logit)
             if case < binary_probs[0]:
                 return n, leaves, "x", local_leaves
             else:
-                n, leaves, result, _ = t2(n-1, leaves, n_v=n_v)
+                n, leaves, result, _ = t2(n - 1, leaves, n_v=n_v)
                 result = f"f({result})"
                 return n, leaves, result, local_leaves + 1
 
         elif leaves > 0 and (local_leaves > 0):
-            binary_probs=np.array([x_logit, p_logit])/(x_logit+p_logit)
+            binary_probs = np.array([x_logit, p_logit]) / (x_logit + p_logit)
             if case < binary_probs[0]:
                 return n, leaves, "x", local_leaves
             else:
-                n_left, leaves_left, result_left, local_leaves = t1(n, leaves-1, local_leaves-1, n_v=n_v)
-                n_right, leaves_right, result_right, local_leaves = t1(n_left, leaves_left, local_leaves, n_v=n_v)
-                return n_right, leaves_right, f"{result_left} + {result_right}", local_leaves
+                n_left, leaves_left, result_left, local_leaves = t1(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                n_right, leaves_right, result_right, local_leaves = t1(
+                    n_left, leaves_left, local_leaves, n_v=n_v
+                )
+                return (
+                    n_right,
+                    leaves_right,
+                    f"{result_left} + {result_right}",
+                    local_leaves,
+                )
         else:
             return n, leaves, "x", local_leaves
-
 
     def t2(n, leaves, local_leaves=None, n_v=n_v):
         if local_leaves is None:
@@ -1041,17 +1136,28 @@ def sample_structure(n=3, n_v=2, binary_probs=(1/2,1/2), ternary_probs=(1/3, 1/3
         case = random.random()
 
         if leaves > 0 and (local_leaves > 0):
-            binary_probs=np.array([x_logit, p_logit])/(x_logit+p_logit)
+            binary_probs = np.array([x_logit, p_logit]) / (x_logit + p_logit)
             if case < binary_probs[0]:
                 return n, leaves, "x", local_leaves
             else:
-                n_left, leaves_left, result_left, local_leaves = t2(n, leaves-1, local_leaves-1, n_v=n_v)
-                n_right, leaves_right, result_right, local_leaves = t2(n_left, leaves_left, local_leaves, n_v=n_v)
-                return n_right, leaves_right, f"{result_left} + {result_right}", local_leaves
+                n_left, leaves_left, result_left, local_leaves = t2(
+                    n, leaves - 1, local_leaves - 1, n_v=n_v
+                )
+                n_right, leaves_right, result_right, local_leaves = t2(
+                    n_left, leaves_left, local_leaves, n_v=n_v
+                )
+                return (
+                    n_right,
+                    leaves_right,
+                    f"{result_left} + {result_right}",
+                    local_leaves,
+                )
         else:
             return n, leaves, "x", local_leaves
+
     random.seed(seed)
     return s(n=n, n_v=n_v)
+
 
 def find_k4(pairs):
     n_rows = 4
@@ -1059,23 +1165,25 @@ def find_k4(pairs):
     n = 6
     symbols = set(range(n))
     # There are 3 adjacent pairs per row, so slots are (row, pos) with pos in 0,1,2
-    slots = [(r, c) for r in range(n_rows) for c in range(n_cols-1)]
+    slots = [(r, c) for r in range(n_rows) for c in range(n_cols - 1)]
     assert len(pairs) == len(slots)
 
     # Try all possible assignments of pairs to adjacent slots
     for ps in tqdm(itertools.permutations(pairs)):
         # Build an empty Latin rectangle for 4 rows, 4 columns
-        mat = [[None]*n_cols for _ in range(n_rows)]
+        mat = [[None] * n_cols for _ in range(n_rows)]
         ok = True
         # Assign all pairs to slots
         for idx, (row, col) in enumerate(slots):
             a, b = ps[idx]
             if mat[row][col] is not None and mat[row][col] != a:
-                ok = False; break
-            if mat[row][col+1] is not None and mat[row][col+1] != b:
-                ok = False; break
+                ok = False
+                break
+            if mat[row][col + 1] is not None and mat[row][col + 1] != b:
+                ok = False
+                break
             mat[row][col] = a
-            mat[row][col+1] = b
+            mat[row][col + 1] = b
         if not ok:
             continue
         # Fill the single missing value in each row and col to complete permutation
@@ -1087,27 +1195,31 @@ def find_k4(pairs):
                 if len(need) == len(idxs) == 1:
                     mat[r][idxs[0]] = need.pop()
                 else:
-                    ok = False; break
+                    ok = False
+                    break
         # Check columns
         for c in range(n_cols):
             col = [mat[r][c] for r in range(n_rows)]
             if len(set(col)) != n_rows:
-                ok = False; break
+                ok = False
+                break
         # Check rows
         for r in range(n_rows):
             if len(set(mat[r])) != n_cols:
-                ok = False; break
+                ok = False
+                break
         if ok:
             print("Found a solution for the first four rows:")
             return mat
     print("No such partial latin rectangle found.")
     return False
 
+
 def find_k2(k3):
     # Only forbid (row[0], row[1]) and (row[1], row[2]) for each row in k3
-    forbidden_k2_pairs = set((row[i], row[i+1]) for row in k3 for i in (0,1))
+    forbidden_k2_pairs = set((row[i], row[i + 1]) for row in k3 for i in (0, 1))
 
-    required_unordered = {tuple(sorted(x)) for x in [[0,3],[1,4],[2,5]]}
+    required_unordered = {tuple(sorted(x)) for x in [[0, 3], [1, 4], [2, 5]]}
 
     n = 6
     symbols = list(range(n))
@@ -1120,13 +1232,17 @@ def find_k2(k3):
         candidates.append((a, b))
 
     def is_valid_rect(rows):
-        if len(rows) != 6: return False
+        if len(rows) != 6:
+            return False
         # Latin rectangle property: all 6 symbols in col 0 and col 1
-        if set(r[0] for r in rows) != set(symbols): return False
-        if set(r[1] for r in rows) != set(symbols): return False
+        if set(r[0] for r in rows) != set(symbols):
+            return False
+        if set(r[1] for r in rows) != set(symbols):
+            return False
         # Contains required unordered pairs
         seen_unordered = set(tuple(sorted(r)) for r in rows)
-        if not required_unordered.issubset(seen_unordered): return False
+        if not required_unordered.issubset(seen_unordered):
+            return False
         return True
 
     for k2_rows in itertools.permutations(candidates, 6):
@@ -1135,12 +1251,15 @@ def find_k2(k3):
         if is_valid_rect(k2_rows):
             return k2_rows
     else:
-        print('No valid k2 found!')
-        
+        print("No valid k2 found!")
+
+
 global_seed_gen = itertools.count()
+
 
 def get_fresh_seed():
     return next(global_seed_gen)
+
 
 def generate_equations(
     functions=FUNCTIONS,
@@ -1170,7 +1289,6 @@ def generate_equations(
 
     problem_grid = hp_meshgrid(problem_domains, problem_groups)
 
-    
     functions_prior = priors_from_space(list(functions.keys()))
     operators_prior = priors_from_space(list(operators.keys()))
     equations = []
@@ -1181,25 +1299,33 @@ def generate_equations(
     grid_config["operators"] = []
     grid_config["features"] = []
 
-    structures=[[0, 1, 1],
-                [0, 1, 2, 2],
-                [0, 1, 1, 2],
-                [0, 1, 2, 1],
-                [0, 1, 2, 1, 2],
-                [0, 1, 2, 2, 3],
-                [0, 1, 2, 3, 2],
-                [0, 1, 2, 2, 1],
-                [0, 1, 1, 2, 2]]
+    structures = [
+        [0, 1, 1],
+        [0, 1, 2, 2],
+        [0, 1, 1, 2],
+        [0, 1, 2, 1],
+        [0, 1, 2, 1, 2],
+        [0, 1, 2, 2, 3],
+        [0, 1, 2, 3, 2],
+        [0, 1, 2, 2, 1],
+        [0, 1, 1, 2, 2],
+    ]
     for params in problem_grid:
         features_prior = {"constants": 0.5, "variables": 0.5}
-        #structure_prior = structure_prior_from_depth(params["depth"])
-        if params["max_nodes"]==5:
-            structure_prior={str(struct): 1/len(structures[-5:]) for struct in structures[-5:]}
-        elif params["max_nodes"]==4:
-            structure_prior={str(struct): 1/len(structures[1:4]) for struct in structures[1:4]}
+        # structure_prior = structure_prior_from_depth(params["depth"])
+        if params["max_nodes"] == 5:
+            structure_prior = {
+                str(struct): 1 / len(structures[-5:]) for struct in structures[-5:]
+            }
+        elif params["max_nodes"] == 4:
+            structure_prior = {
+                str(struct): 1 / len(structures[1:4]) for struct in structures[1:4]
+            }
         else:
-            structure_prior={str(struct): 1/len(structures[:1]) for struct in structures[:1]}
-            
+            structure_prior = {
+                str(struct): 1 / len(structures[:1]) for struct in structures[:1]
+            }
+
         prior = {
             "structures": structure_prior,
             "functions": functions_prior,
@@ -1224,9 +1350,15 @@ def generate_equations(
             np.random.seed(seed)
 
         equations += [
-            (equation, params["sampling_seed"], seed, params["training_domain"], params["constants_domain"])
+            (
+                equation,
+                params["sampling_seed"],
+                seed,
+                params["training_domain"],
+                params["constants_domain"],
+            )
         ]
-        #print("fresh sample: ", equations[-1])
+        # print("fresh sample: ", equations[-1])
     # print(equations)
 
     grid_config["problem_domains"] = problem_domains
@@ -1338,29 +1470,29 @@ def remove_unit_coeff(expr):
     else:
         return expr
 
-    
+
 def ensure_symbolic(x):
     if isinstance(x, sp.Basic):
         return x
     else:
         return sp.sympify(x)
-    
+
+
 def norm_sin(s):
     arg = s.args[0]
     # split arg = var_part + const_part
     const, varpart = arg.as_independent(*arg.free_symbols, as_Add=True)
     # reduce the constant into [0,2π)
-    phi = float(const % (2*float(sp.pi)))
+    phi = float(const % (2 * float(sp.pi)))
     return sp.sin(varpart + phi)
+
 
 def unify_float_precision(expr, precision=10):
     # build a mapping old_Float → new_Float(at the desired precision)
-    repl = {
-        f: sp.Float(str(f), precision=precision)
-        for f in expr.atoms(sp.Float)
-    }
+    repl = {f: sp.Float(str(f), precision=precision) for f in expr.atoms(sp.Float)}
     return expr.xreplace(repl)
-    
+
+
 def simplify(exp, decimal_points=3, sensitivity=0.1):  # naive
     """
     Simplifies the input expression by rounding numerical values to a specified number of decimal points
@@ -1388,7 +1520,7 @@ def simplify(exp, decimal_points=3, sensitivity=0.1):  # naive
                 exp = exp.subs(a, sp.Float(0))
             else:
                 exp = exp.subs(a, rounded)
-    exp=ensure_symbolic(exp)
+    exp = ensure_symbolic(exp)
     return remove_unit_coeff(exp)
 
 
@@ -1403,17 +1535,17 @@ def str_to_sympy(string, var="x_"):
     # Make all available sympy functions and constants available in eval by combining them with symbols
     all_sympy_names = {
         name: obj
-        for name, obj in sp.__dict__.items()      # same as vars(sp)
-        if not name.startswith('_')               # skip private helpers
-        and not isinstance(obj, types.ModuleType) # skip sub-modules
+        for name, obj in sp.__dict__.items()  # same as vars(sp)
+        if not name.startswith("_")  # skip private helpers
+        and not isinstance(obj, types.ModuleType)  # skip sub-modules
     }
     all_context = {**symbols_dict, **all_sympy_names}
     all_context
 
     # Safe eval with all sympy names
-    #print("---------------------")
-    #print(string)
-    #print(all_context)
+    # print("---------------------")
+    # print(string)
+    # print(all_context)
     return eval(string, {"__builtins__": {}}, all_context)
 
 
@@ -1516,44 +1648,54 @@ def load_config(prefix, number, n_digits=None):
         config = json.load(f)
     return config
 
+
 def load_equations(filename, var="x_"):
     with open(filename, "rt") as f:
-        eqs=f.read().splitlines()
+        eqs = f.read().splitlines()
     print(eqs)
-    #return [equation_tree.EquationTree.from_sympy(str_to_sympy(eq, var=var)) for eq in eqs]
+    # return [equation_tree.EquationTree.from_sympy(str_to_sympy(eq, var=var)) for eq in eqs]
     return [str_to_sympy(eq, var=var) for eq in eqs]
-    
+
+
 def sympy_to_dataset(eq, n=1000, seed=42, domain=(-1.0, 1.0), sampling="uniform"):
     np.random.seed(seed)
     # Obtain the free variables, sorted as 'x_1', 'x_2', ...
-    vars_sorted = [sp.symbols(f'x_{i+1}') for i in range(len(eq.free_symbols))]
+    vars_sorted = [sp.symbols(f"x_{i+1}") for i in range(len(eq.free_symbols))]
     # Uniformly sample 4*n inputs in the domain
     low, high = domain
     sample_count = 4 * n
     X = np.random.uniform(low, high, size=(sample_count, len(vars_sorted)))
     # Make a numpy-callable version of the equation
-    fnum = sp.lambdify(vars_sorted, eq, 'numpy')
+    fnum = sp.lambdify(vars_sorted, eq, "numpy")
     # Evaluate
     Y = fnum(*[X[:, i] for i in range(len(vars_sorted))])
     Y = np.array(Y)
     # Find non-nan evaluations
     valid_mask = ~np.isnan(Y)
     valid_X = X[valid_mask]
-    valid_Y = Y[valid_mask][:,None]
+    valid_Y = Y[valid_mask][:, None]
     if valid_X.shape[0] < n:
-        raise SamplingError(f"Fewer than n ({n}) non-nan samples. Only {valid_X.shape[0]} found for {eq}.")
+        raise SamplingError(
+            f"Fewer than n ({n}) non-nan samples. Only {valid_X.shape[0]} found for {eq}."
+        )
     # Take first n valid samples
     X_out = valid_X[:n]
     Y_out = valid_Y[:n]
-    return ({
-        "train_input": X_out,    # shape (n, n_free_variables)
-        "train_label": Y_out     # shape (n,)
-    }, eq)
-    
-    
-    
+    return (
+        {
+            "train_input": X_out,  # shape (n, n_free_variables)
+            "train_label": Y_out,  # shape (n,)
+        },
+        eq,
+    )
+
+
 def equation_to_dataset(
-    equation, n=1000, seed=42, domain=(-1.0, 1.0), sampling="uniform",
+    equation,
+    n=1000,
+    seed=42,
+    domain=(-1.0, 1.0),
+    sampling="uniform",
 ):
     """
     expects EquationTree
@@ -1563,14 +1705,19 @@ def equation_to_dataset(
 
     print(f"sampling from {equation}\n with seed: {seed}")
     datasets, fixed_equations, running_seed = create_datasets(
-        [equation], n=n, seed=seed, domain=domain, sampling=sampling, constants_domain=(-1.0,1.0),
+        [equation],
+        n=n,
+        seed=seed,
+        domain=domain,
+        sampling=sampling,
+        constants_domain=(-1.0, 1.0),
     )
     dataset = datasets[0]
     equation = fixed_equations[0].sympy_expr
 
     var = sorted(list(map(str, equation.free_symbols)))
     print(var)
-    #print(f"var: {var}")
+    # print(f"var: {var}")
     pykan_dataset = dict()  # pd.DataFrame()
     # pykan_dataset=dataset.drop(columns=["y"]).values.tolist()
     # print(pykan_dataset.agg(lambda x: [].append, axis=1))
@@ -1588,28 +1735,41 @@ def equation_to_dataset(
 
 
 def equation_to_datasets(
-    equation, n=1000, seed=42, domain=(-1.0, 1.0), sampling="uniform", test_domain=None, constants_domain=(-1.0, 1.0), val_domain=None, val_size=None,
+    equation,
+    n=1000,
+    seed=42,
+    domain=(-1.0, 1.0),
+    sampling="uniform",
+    test_domain=None,
+    constants_domain=(-1.0, 1.0),
+    val_domain=None,
+    val_size=None,
 ):
     """
     expects EquationTree
     raises BadDomainException
     todo: check if you gotta get rid of dfs in memory
     """
-    if val_size==None:
-        val_size=n//10
+    if val_size == None:
+        val_size = n // 10
     if test_domain is None:
-        test_domain=domain
+        test_domain = domain
     if val_domain is None:
-        val_domain=[domain,domain]
+        val_domain = [domain, domain]
     print(f"sampling from {equation}\n with seed: {seed}")
     datasets, fixed_equations, running_seed = create_datasets(
-        [equation], n=n, seed=seed, domain=domain, sampling=sampling, constants_domain=constants_domain,
+        [equation],
+        n=n,
+        seed=seed,
+        domain=domain,
+        sampling=sampling,
+        constants_domain=constants_domain,
     )
     dataset = datasets[0]
     equation = fixed_equations[0].sympy_expr
 
     var = sorted(list(map(str, equation.free_symbols)))
-    #print(f"var: {var}")
+    # print(f"var: {var}")
     pykan_dataset = dict()  # pd.DataFrame()
     # pykan_dataset=dataset.drop(columns=["y"]).values.tolist()
     # print(pykan_dataset.agg(lambda x: [].append, axis=1))
@@ -1624,57 +1784,75 @@ def equation_to_datasets(
         np.array([item for row in annoying for item in row]).reshape((n, indim))
     )
 
-
     if test_domain is None:
         testsets, _, running_seed = create_datasets(
-            fixed_equations, n=n//10, seed=running_seed, domain=domain, sampling=sampling, constants_set=True
+            fixed_equations,
+            n=n // 10,
+            seed=running_seed,
+            domain=domain,
+            sampling=sampling,
+            constants_set=True,
         )
     else:
-        distribution = lambda : np.random.uniform(test_domain[0], test_domain[1])
+        distribution = lambda: np.random.uniform(test_domain[0], test_domain[1])
         testsets, _, running_seed = create_datasets(
-            fixed_equations, n=n, seed=running_seed, domain=domain, sampling=sampling, distribution=distribution, constants_set=True,
+            fixed_equations,
+            n=n,
+            seed=running_seed,
+            domain=domain,
+            sampling=sampling,
+            distribution=distribution,
+            constants_set=True,
         )
-        
+
     if val_domain is None:
         valsets, _, running_seed = create_datasets(
-            fixed_equations, n=val_size, seed=running_seed, domain=domain, sampling=sampling, constants_set=True
+            fixed_equations,
+            n=val_size,
+            seed=running_seed,
+            domain=domain,
+            sampling=sampling,
+            constants_set=True,
         )
     else:
-        if np.max(val_domain[0])>np.min(val_domain[1]):
-            distribution = lambda : np.random.uniform(np.min(val_domain[0]), np.max(val_domain[1]))
+        if np.max(val_domain[0]) > np.min(val_domain[1]):
+            distribution = lambda: np.random.uniform(
+                np.min(val_domain[0]), np.max(val_domain[1])
+            )
         else:
-            distribution = lambda : np.random.choice([np.random.uniform(min_val, max_val) for min_val, max_val in val_domain])
+            distribution = lambda: np.random.choice(
+                [np.random.uniform(min_val, max_val) for min_val, max_val in val_domain]
+            )
         valsets, _, running_seed = create_datasets(
-            fixed_equations, n=val_size, seed=running_seed, domain=domain, sampling=sampling, distribution=distribution, constants_set=True,
+            fixed_equations,
+            n=val_size,
+            seed=running_seed,
+            domain=domain,
+            sampling=sampling,
+            distribution=distribution,
+            constants_set=True,
         )
-        
-    valset=valsets[0]
-    testset=testsets[0]
+
+    valset = valsets[0]
+    testset = testsets[0]
     print(f"fixed still fixed: {fixed_equations}, {_}")
-    
+
     pykan_dataset["test_label"] = torch.tensor(testset["observation"].to_numpy())[
         :, None
     ]
-    
-    
+
     annoying = testset.loc[:, var].apply(lambda row: row.tolist(), axis=1).to_numpy()
     indim = len(annoying[0])
 
-    
     pykan_dataset["test_input"] = torch.tensor(
         np.array([item for row in annoying for item in row]).reshape((n, indim))
     )
-    
-    
-    pykan_dataset["val_label"] = torch.tensor(valset["observation"].to_numpy())[
-        :, None
-    ]
-    
-    
+
+    pykan_dataset["val_label"] = torch.tensor(valset["observation"].to_numpy())[:, None]
+
     annoying = valset.loc[:, var].apply(lambda row: row.tolist(), axis=1).to_numpy()
     indim = len(annoying[0])
 
-    
     pykan_dataset["val_input"] = torch.tensor(
         np.array([item for row in annoying for item in row]).reshape((val_size, indim))
     )
@@ -1689,7 +1867,16 @@ class BadDomainException(Exception):
     pass
 
 
-def create_datasets(equations, n=100, seed=42, domain=(-1.0, 1.0), sampling="uniform", constants_domain=(-1.0,1.0), distribution=None, constants_set=False):
+def create_datasets(
+    equations,
+    n=100,
+    seed=42,
+    domain=(-1.0, 1.0),
+    sampling="uniform",
+    constants_domain=(-1.0, 1.0),
+    distribution=None,
+    constants_set=False,
+):
     datasets = []
     fixed_equations = []
     print("running seed:", seed)
@@ -1703,9 +1890,11 @@ def create_datasets(equations, n=100, seed=42, domain=(-1.0, 1.0), sampling="uni
         j = 0
         while not constants_fine:
             np.random.seed(seed + j)
-            
+
             if not constants_set:
-                constants_prior = lambda: np.random.uniform(constants_domain[0], constants_domain[1], 1)[0]
+                constants_prior = lambda: np.random.uniform(
+                    constants_domain[0], constants_domain[1], 1
+                )[0]
 
                 equation = instantiate_constants(equation, constants_prior)
 
@@ -1717,22 +1906,25 @@ def create_datasets(equations, n=100, seed=42, domain=(-1.0, 1.0), sampling="uni
             # print("random state hint before:", np.random.random(5))
 
             equation.get_evaluation(
-                min_val=domain[0], max_val=domain[1], num_samples=n * 4, distribution=distribution,
+                min_val=domain[0],
+                max_val=domain[1],
+                num_samples=n * 4,
+                distribution=distribution,
             )
             dataset = equation.value_samples_as_df
-    
+
             if dataset.isnull().values.all():
                 j += 1
                 continue
-            
+
             # Use the replace method to set inf/-inf to NaN
             dataset.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-            '''# Optionally, clip values to the limits of float64 if they are too extreme
+            """# Optionally, clip values to the limits of float64 if they are too extreme
             float64_max = np.finfo(np.float64).max
             float64_min = -float64_max
-            dataset = dataset.clip(lower=float64_min, upper=float64_max)'''
-            
+            dataset = dataset.clip(lower=float64_min, upper=float64_max)"""
+
             try:
                 dataset = dataset.dropna().iloc[np.arange(n)].reset_index(drop=True)
                 datasets.append(dataset)
@@ -1744,7 +1936,7 @@ def create_datasets(equations, n=100, seed=42, domain=(-1.0, 1.0), sampling="uni
             break
 
     # print(f"example data: {datasets[0].head()}")
-    return datasets, fixed_equations, seed+j+1
+    return datasets, fixed_equations, seed + j + 1
 
 
 def default_pykan(equation, seed=42, hidden_size=5):
@@ -1761,6 +1953,7 @@ def default_pykan(equation, seed=42, hidden_size=5):
     model = KAN(width=[in_size, *hidden_size, 1], grid=5, k=3, seed=seed, device=device)
     return model
 
+
 def default_structure(equation, hidden_size=5):
 
     try:
@@ -1774,30 +1967,38 @@ def default_structure(equation, hidden_size=5):
 def testseed():
     print(np.random.random(size=10))
 
+
 def kan_from_mask(structure, model=None, seed=42, **kwargs):
 
-    structure=copy.deepcopy(structure)
-    
-    device = (
-        torch.get_default_device()
-    )
-    
+    structure = copy.deepcopy(structure)
+
+    device = torch.get_default_device()
+
     for i in range(len(structure)):
-        structure[i]=torch.tensor(structure[i]).float()
+        structure[i] = torch.tensor(structure[i]).float()
     if model is None:
         # mask shape = (in_nodes, out_nodes)
-        model=KAN(width=[structure[0].shape[0]]+[structure[i].shape[1] for i in range(len(structure))], grid=5, k=3, seed=seed, device=device, **kwargs)
+        model = KAN(
+            width=[structure[0].shape[0]]
+            + [structure[i].shape[1] for i in range(len(structure))],
+            grid=5,
+            k=3,
+            seed=seed,
+            device=device,
+            **kwargs,
+        )
 
     for m in range(len(model.act_fun)):
         model.act_fun[m].mask.data = structure[m]
-        
+
     return model
+
 
 # Context to suppress stdout
 class SuppressStdout:
     def __enter__(self):
         self._original_stdout = sys.stdout  # Save the current stdout
-        sys.stdout = open(os.devnull, 'w')  # Redirect stdout to null device
+        sys.stdout = open(os.devnull, "w")  # Redirect stdout to null device
 
     def __exit__(self, exc_type, exc_value, traceback):
         sys.stdout.close()  # Close the devnull file
@@ -1805,16 +2006,23 @@ class SuppressStdout:
 
 
 def size_mapping(darts_size, n_inputs):
-    # really naive size mapping darts -> layered 
-    
+    # really naive size mapping darts -> layered
+
     n_darts = lambda size, n_in: sum([n_in + (i) for i in range(size)])
-    n_layered = lambda size, n_in: n_in * (2*n_in)+1+sum([2*n_in+1+i for i in range(int(size)-1)])
+    n_layered = (
+        lambda size, n_in: n_in * (2 * n_in)
+        + 1
+        + sum([2 * n_in + 1 + i for i in range(int(size) - 1)])
+    )
     n_params = n_darts(darts_size, n_inputs)
-    layered_params = [n_layered(layered_size, n_inputs) for layered_size in np.arange(15)]
+    layered_params = [
+        n_layered(layered_size, n_inputs) for layered_size in np.arange(15)
+    ]
     layered_size = np.searchsorted(np.array(layered_params), n_params)
     return layered_size
 
-'''
+
+"""
         
 from dataclasses import dataclass, field
 print(dataclass.__module__)
@@ -1827,7 +2035,8 @@ class Monitor:
     train_loss: list = field(default_factory=list)
     val_loss: list = field(default_factory=list)
     test_loss: list = field(default_factory=list)
-    alphas: list = field(default_factory=list)'''
+    alphas: list = field(default_factory=list)"""
+
 
 class NumericTensorJSONEncoder(json.JSONEncoder):
     """
@@ -1839,15 +2048,15 @@ class NumericTensorJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         # -------- Python & NumPy scalars -----------------------------------
         if isinstance(obj, (np.integer, np.floating, np.bool_)):
-            return obj.item()                      # plain int / float / bool
+            return obj.item()  # plain int / float / bool
         if isinstance(obj, (complex, np.complexfloating)):
-            return str(obj)                        # "1+2j", "-0.5j", …
+            return str(obj)  # "1+2j", "-0.5j", …
 
         # -------- NumPy arrays ---------------------------------------------
         if isinstance(obj, np.ndarray):
             if np.iscomplexobj(obj):
-                return obj.astype(str).tolist()    # list of strings
-            return obj.tolist()                    # list of numbers / bools
+                return obj.astype(str).tolist()  # list of strings
+            return obj.tolist()  # list of numbers / bools
 
         # -------- PyTorch tensors ------------------------------------------
         if torch is not None and isinstance(obj, torch.Tensor):

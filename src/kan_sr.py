@@ -5,6 +5,7 @@ import warnings
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
+import sympy
 import torch
 from src.fit1d import SYMBOLIC_LIB, SYMBOLIC_TUPLE_LIB
 from tqdm import tqdm
@@ -1073,3 +1074,158 @@ class KAN_SR(OriginalMultKAN):
         best_params = params_list[0]
 
         return best_name, best_fun, best_r2, best_params
+
+    # Overwritten because
+    # - missing kwarg "simplify"
+    # - added stacked primitives
+    def symbolic_formula(
+        self, var=None, normalizer=None, output_normalizer=None, simplify=True
+    ):
+        """
+        get symbolic formula
+
+        Args:
+        -----
+            var : None or a list of sympy expression
+                input variables
+            normalizer : [mean, std]
+            output_normalizer : [mean, std]
+
+        Returns:
+        --------
+            None
+
+        Example
+        -------
+        >>> from kan import *
+        >>> model = KAN(width=[2,1,1], grid=5, k=3, noise_scale=0.0, seed=0)
+        >>> f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]])+x[:,[1]]**2)
+        >>> dataset = create_dataset(f, n_var=3)
+        >>> model.fit(dataset, opt='LBFGS', steps=20, lamb=0.001);
+        >>> model.auto_symbolic()
+        >>> model.symbolic_formula()[0][0]
+        """
+
+        symbolic_acts = []
+        symbolic_acts_premult = []
+        x = []
+
+        def ex_round(ex1, n_digit):
+            ex2 = ex1
+            for a in sympy.preorder_traversal(ex1):
+                if isinstance(a, sympy.Float):
+                    ex2 = ex2.subs(a, round(a, n_digit))
+            return ex2
+
+        # define variables
+        if var == None:
+            for ii in range(1, self.width[0][0] + 1):
+                exec(f"x{ii} = sympy.Symbol('x_{ii}')")
+                exec(f"x.append(x{ii})")
+        elif isinstance(var[0], sympy.Expr):
+            x = var
+        else:
+            x = [sympy.symbols(var_) for var_ in var]
+
+        x0 = x
+
+        if normalizer != None:
+            mean = normalizer[0]
+            std = normalizer[1]
+            x = [(x[i] - mean[i]) / std[i] for i in range(len(x))]
+
+        symbolic_acts.append(x)
+
+        for l in range(len(self.width_in) - 1):
+            num_sum = self.width[l + 1][0]
+            num_mult = self.width[l + 1][1]
+            y = []
+            for j in range(self.width_out[l + 1]):
+                yj = 0.0
+                for i in range(self.width_in[l]):
+                    params = self.symbolic_fun[l].affine[j, i]
+                    name = self.symbolic_fun[l].funs_name[j][i]
+                    sympy_fun = self.symbolic_fun[l].funs_sympy[j][i]
+                    if isinstance(name, str):
+                        a, b, c, d, _, _ = params
+                        try:
+                            yj += a * sympy_fun(b * x[i] + c) + d
+                        except Exception as e:
+                            print(
+                                "make sure all activations need to be converted to symbolic formulas first!"
+                            )
+                            raise e
+                    elif isinstance(name, tuple):
+                        a, b, c, d, e, f = params
+                        try:
+                            # inner
+                            inner = b * sympy_fun[1](c * x[i] + d) + e
+                            # outer
+                            yj += a * sympy_fun[0](inner) + f
+                        except Exception as e:
+                            print(
+                                "make sure all activations need to be converted to symbolic formulas first!"
+                            )
+                            raise e
+
+                yj = self.subnode_scale[l][j] * yj + self.subnode_bias[l][j]
+                if simplify == True:
+                    y.append(sympy.simplify(yj))
+                else:
+                    y.append(yj)
+
+            symbolic_acts_premult.append(y)
+
+            mult = []
+            for k in range(num_mult):
+                if isinstance(self.mult_arity, int):
+                    mult_arity = self.mult_arity
+                else:
+                    mult_arity = self.mult_arity[l + 1][k]
+                for i in range(mult_arity - 1):
+                    if i == 0:
+                        mult_k = y[num_sum + 2 * k] * y[num_sum + 2 * k + 1]
+                    else:
+                        mult_k = mult_k * y[num_sum + 2 * k + i + 1]
+                mult.append(mult_k)
+
+            y = y[:num_sum] + mult
+
+            for j in range(self.width_in[l + 1]):
+                y[j] = self.node_scale[l][j] * y[j] + self.node_bias[l][j]
+
+            x = y
+            symbolic_acts.append(x)
+
+        if output_normalizer != None:
+            output_layer = symbolic_acts[-1]
+            means = output_normalizer[0]
+            stds = output_normalizer[1]
+
+            assert len(output_layer) == len(
+                means
+            ), "output_normalizer does not match the output layer"
+            assert len(output_layer) == len(
+                stds
+            ), "output_normalizer does not match the output layer"
+
+            output_layer = [
+                (output_layer[i] * stds[i] + means[i]) for i in range(len(output_layer))
+            ]
+            symbolic_acts[-1] = output_layer
+
+        self.symbolic_acts = [
+            [symbolic_acts[l][i] for i in range(len(symbolic_acts[l]))]
+            for l in range(len(symbolic_acts))
+        ]
+        self.symbolic_acts_premult = [
+            [symbolic_acts_premult[l][i] for i in range(len(symbolic_acts_premult[l]))]
+            for l in range(len(symbolic_acts_premult))
+        ]
+
+        out_dim = len(symbolic_acts[-1])
+
+        if simplify:
+            return [symbolic_acts[-1][i] for i in range(len(symbolic_acts[-1]))], x0
+        else:
+            return [symbolic_acts[-1][i] for i in range(len(symbolic_acts[-1]))], x0

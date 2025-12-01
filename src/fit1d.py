@@ -1395,6 +1395,7 @@ def fit_stacked(fun_name, x, y, n_restarts=N_RESTARTS, solver_dict=None, fit_dic
 
     if fit_dict is None:
         fit_dict = FIT_ROUTINE  # global default
+
     fit_fun = fit_dict[outer]
 
     # --- stats for x ---------------------------------------------------

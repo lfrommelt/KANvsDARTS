@@ -20,6 +20,33 @@ import matplotlib as mpl
 import sympy as sp
 
 
+class NanError(Exception):
+    pass
+
+
+@dataclass
+class Monitor:
+    """
+    No callback, just use for storing traing curves
+    """
+
+    train_loss: list = field(default_factory=list)
+    val_loss: list = field(default_factory=list)
+    test_loss: list = field(default_factory=list)
+    alphas: list = field(default_factory=list)
+    coefficients: torch.Tensor = torch.zeros(1)
+
+
+class ContextClass:
+    """
+    Simple class just for enabling static attributes as a safe and
+    unambigous way of having global variables
+    """
+
+    gumbel_softmax_enabled = False
+    discrete_enabled = False
+
+
 def sample_and_replace(text: str, seed: int) -> str:
     """
     Replaces exactly one plus sign ('+') in `text` with an asterisk ('*').

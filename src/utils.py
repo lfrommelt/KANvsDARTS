@@ -19,6 +19,68 @@ import matplotlib as mpl
 
 import sympy as sp
 
+# logging_setup.py
+import logging
+from pathlib import Path
+
+
+class DebugOnlyFormatter(logging.Formatter):
+    """DEBUG -> detailed format; other levels -> plain message."""
+
+    def __init__(self, debug_fmt, default_fmt, datefmt=None):
+        super().__init__(default_fmt, datefmt=datefmt)
+        self._debug_formatter = logging.Formatter(debug_fmt, datefmt=datefmt)
+
+    def format(self, record):
+        if record.levelno == logging.DEBUG:
+            return self._debug_formatter.format(record)
+        return super().format(record)
+
+
+def configure_logging(log_file, level=logging.INFO, overwrite=False):
+    """
+    Configure global logging to write into `log_file`.
+
+    Parameters
+    ----------
+    log_file : str or Path
+        Full path to the log file.
+    level : int
+        Logging level (e.g. logging.INFO, logging.DEBUG).
+    overwrite : bool
+        If True, the log file is truncated each time.
+        If False, logs are appended to an existing file.
+    """
+    root = logging.getLogger()  # root logger (global)
+    root.setLevel(level)
+
+    # Remove and close old handlers so we can reconfigure safely
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+        h.close()
+
+    log_path = Path(log_file)
+    # Ensure parent directory exists
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    formatter = DebugOnlyFormatter(
+        debug_fmt="%(levelname)s:%(module)s:%(message)s",  # for DEBUG
+        default_fmt="%(message)s",  # for INFO+
+    )
+
+    """# Console handler (optional)
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    console.setFormatter(formatter)
+    root.addHandler(console)"""
+
+    # File handler
+    mode = "w" if overwrite else "a"
+    file_handler = logging.FileHandler(log_path, encoding="utf-8", mode=mode)
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)
+
 
 class NanError(Exception):
     pass

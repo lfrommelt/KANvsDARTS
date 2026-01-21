@@ -1,10 +1,13 @@
 from itertools import chain
+import logging
 from types import SimpleNamespace
 import matplotlib.pyplot as plt
 
 # from kan.MultKAN import KAN
 from src.kan_sr import KAN_SR
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def safe_fit(kan_model, dataset, **kwargs):
@@ -49,7 +52,6 @@ def train_kan(config, dataset, tolerance=0.9):
         device="cpu",
         real_affine_trainable=0.0,
     )
-
     eps = 1e-10
     ## Structure Phase
     lt = np.inf
@@ -97,6 +99,10 @@ def train_kan(config, dataset, tolerance=0.9):
 
         # forward pass for pruning values
         model(dataset["train_input"])
+        model.attribute()
+
+        logger.info(f"KAN before pruning {steps}:")
+        model.log_self()
         check = model.prune_minimally(
             dataset["train_input"],
             v=False,
@@ -104,14 +110,23 @@ def train_kan(config, dataset, tolerance=0.9):
             per_neuron=False,
             semi_minimal=False,
         )
+
+        logger.info(f"KAN after pruning {steps}:")
+        model.log_self()
+
         if check is None:
+            logger.info("Cannot prune further")
             break
+        logger.info(
+            f"Next pruning iteration if not {lt_1} * {tolerance} > {lt} = {not(lt_1 * tolerance > lt)}"
+        )
         # model.plot()
         # plt.show()
 
         lt_1 = logs[-1]["test_loss"][-1]
     outcome = [steps]
 
+    logger.info(f"Rewinding to {checkpoint}")
     model = model.rewind(checkpoint)
 
     steps = 0
@@ -119,6 +134,7 @@ def train_kan(config, dataset, tolerance=0.9):
     outcome.append("normal")
     while sum([act_fun.mask.sum() for act_fun in model.act_fun]):
         steps += 1
+        logger.info(f"---symbolification step {steps}---")
         log, outcome_ = safe_fit(
             model,
             dataset,
@@ -143,6 +159,7 @@ def train_kan(config, dataset, tolerance=0.9):
             verbose=False,
             print_gradients=False,
         )
+        logger.info(f"Outcome: {outcome}")
         if outcome_ == "safe":
             outcome[1] = "safe"
         logs.append(log)

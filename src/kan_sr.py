@@ -1,4 +1,5 @@
 import importlib
+import logging
 import math
 import os
 import warnings
@@ -19,6 +20,8 @@ mult_mod = importlib.import_module("kan.MultKAN")
 
 from src.layer_wrappers import SymbolicKANLayerPlus
 
+logger = logging.getLogger(__name__)
+
 # Monkey-Patch layer wrappers to the namespace that will be used by kan.MultKAN
 mult_mod.Symbolic_KANLayer = SymbolicKANLayerPlus
 OriginalMultKAN = mult_mod.MultKAN
@@ -34,8 +37,10 @@ class KAN_SR(OriginalMultKAN):
 
     def __init__(self, width, real_affine_trainable=False, **kwargs):
         mult_mod.MultKAN = OriginalMultKAN
+        # init multkan sets torch, np and random seeds
         super().__init__(width=width, **kwargs)
         mult_mod.MultKAN = KAN_SR
+        print('init with "width":', self.width)
         self.real_affine_trainable = real_affine_trainable
         if "seed" in kwargs:
             self.set_seed(kwargs["seed"])
@@ -43,10 +48,28 @@ class KAN_SR(OriginalMultKAN):
         else:
             seed = type(self).seed
             self.shuffling_rng = np.random.default_rng(seed)
+        logger.info(f"KAN at init:")
+        self.log_self()
 
     @classmethod
     def set_seed(cls, value):
         cls.seed = value
+
+    def log_self(self, exhaustive=True):
+
+        description = f"----------\nshape: {self.width}"
+        description += "\nmask:"
+        for layer in range(self.depth):
+            description += f"\n{self.act_fun[layer].mask.numpy()}"
+        logger.info(description)
+        description = ""
+        if not (self.edge_scores is None):
+            description += "\nscores:"
+            for layer in range(self.depth):
+                description += f"\n{self.edge_scores[layer]}"
+            logger.debug(description)
+        logger.info("\n----------")
+        return description
 
     def fit(
         self,
@@ -681,34 +704,78 @@ class KAN_SR(OriginalMultKAN):
 
     @torch.no_grad
     def prune_minimally(
-        self, trainset, v=False, local=True, per_neuron=True, semi_minimal=False
+        self,
+        trainset,
+        v=False,
+        local=True,
+        per_neuron=True,
+        semi_minimal=False,
+        min_thresh=1e-5,
+        log_history=True,
     ):
         self.forward(trainset)
         self.attribute()
+
+        for layer in range(0, self.depth):
+            print(f"mask{layer}:", self.act_fun[layer].mask)
+            print(self.edge_scores[layer])
+        print("----------------")
+
         if v:
             print(self.edge_scores)
 
         if not local:
             minimal_edge = np.inf
+            minimal_edge_idx = None
             for layer in range(len(self.edge_scores)):
                 # killing layers not possible, yet
                 if self.act_fun[layer].mask.data.bool().sum().item() > 1:
                     minimal_edge = min(
-                        (
+                        min(
                             edge
                             for edge in self.edge_scores[layer][
                                 self.act_fun[layer].mask.data.bool().permute(1, 0)
                             ]
-                        )
+                        ),
+                        minimal_edge,
                     )
+                    print(minimal_edge)
 
             if math.isinf(minimal_edge):
                 print(f"cannot prune further")
                 return None
+            else:
+                minimal_edge = max(minimal_edge, min_thresh)
 
             print(f"pruning score {minimal_edge}")
-            self = self.prune_edge(threshold=minimal_edge, log_history=True)
+            logger.info(f"pruning score {minimal_edge}")
 
+            # self = self.prune_edge(threshold=minimal_edge, log_history=True)
+            # lets prune ourselfes, so that specific cases can be accounted for
+
+            for layer in range(len(self.edge_scores)):
+                # no pruning if only one node remains
+                if self.act_fun[layer].mask.data.bool().sum().item() > 1:
+                    # reset threshold if the min thresh would otherwise kill layer (highly unlikely)
+                    if minimal_edge >= sorted(self.edge_scores[layer].view(-1))[0]:
+                        specific_thresh = sorted(self.edge_scores[layer].view(-1))[1]
+                    else:
+                        specific_thresh = minimal_edge
+                    logger.debug(
+                        f"Specific threshold for layer {layer}: {specific_thresh}"
+                    )
+                    old_mask = self.act_fun[layer].mask.data
+                    self.act_fun[layer].mask.data = (
+                        (self.edge_scores[layer] > specific_thresh).permute(1, 0)
+                        * old_mask
+                    ).float()
+                else:
+                    logger.debug(
+                        f"Active edge count layer {layer}: {self.act_fun[layer].mask.data.bool().sum().item()}"
+                    )
+
+            if log_history:
+                self.log_history("prune edge")
         else:
             ratio = 0.0
             index = None
@@ -820,8 +887,13 @@ class KAN_SR(OriginalMultKAN):
             print(self.edge_scores)
         self = self.prune_node(threshold=1e-8)
 
+        for layer in range(0, self.depth):
+            print(f"mask{layer}:", self.act_fun[layer].mask)
         # prune edges that became obsolete after node pruning
         self.attribute()
+
+        print(self.edge_scores)
+
         self = self.prune_edge(threshold=1e-8)
         self.log_history("prune")
 
@@ -834,13 +906,31 @@ class KAN_SR(OriginalMultKAN):
 
         return self
 
-    def prune_edge(self, *args, **kwargs):
-        # small wrapper to make the apis in the kan library more consistent
-        super().prune_edge(*args, **kwargs)
+    def prune_edge(self, threshold=3e-2, log_history=True):
+        # cosistent api (return self), fixed logging, never prune whole layer
+        if self.acts == None:
+            self.get_act()
+
+        for layer in range(len(self.width) - 1):
+            if sum(self.act_fun[layer].mask.data.view(-1)) < 2:
+                continue
+            else:
+                specific_thresh = min
+                # self.act_fun[i].mask.data = ((self.acts_scale[i] > threshold).permute(1,0)).float()
+                old_mask = self.act_fun[layer].mask.data
+                self.act_fun[layer].mask.data = (
+                    (self.edge_scores[layer] > threshold).permute(1, 0) * old_mask
+                ).float()
+
+        if log_history:
+            self.log_history("fix_symbolic")
         return self
 
+        """# small wrapper to make the apis in the kan library more consistent
+        super().prune_edge(*args, **kwargs)
+        return self"""
+
     def prune_node(self, *args, **kw):
-        print("call prune node (subclasses method)")
         # gotta do this whenever the constructor is implicitly called....
         mult_mod.MultKAN = OriginalMultKAN
         pruned = OriginalMultKAN.prune_node(self, *args, **kw)
@@ -935,6 +1025,9 @@ class KAN_SR(OriginalMultKAN):
             print(
                 f"fixing ({l},{i},{j}) with {best_name}, r2={best_r2}, params={best_params}"
             )
+            logger.info(
+                f"fixing ({l},{i},{j}) with {best_name}, r2={best_r2}, params={best_params}"
+            )
 
             for name, fun, r2, params, idx in results[1:]:
                 # print("fun name mk 2834", name)
@@ -942,6 +1035,9 @@ class KAN_SR(OriginalMultKAN):
                 if r2 <= r2_threshold:
                     if verbose >= 1:
                         print(
+                            f"fixing ({l},{i},{j}) with {name}, r2={r2}, params={params}"
+                        )
+                        logger.info(
                             f"fixing ({l},{i},{j}) with {name}, r2={r2}, params={params}"
                         )
                     self.symbolic_fun[l].fix_symbolic_explicit(i, j, name, params)

@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from types import SimpleNamespace
 import numpy as np
@@ -31,9 +32,14 @@ from sklearn.model_selection import ParameterGrid
 
 
 from src.train_kan import train_kan
+from src.utils import configure_logging
 
 # print(train)
 # import src.utils
+
+log_level = logging.DEBUG
+# log_level = logging.INFO
+overwrite_log = True
 
 dataset_folder = "datasets"
 folder = "Results_KAN"
@@ -110,9 +116,9 @@ grid = {
 # conditions
 c_multiplication = (False, True)
 c_prior_knowledge = (True, False)
-c_linear_transformations = (True,)  # (False, True)
+c_linear_transformations = (False, True)
 
-# for simulatin results for debugging
+# for simulating results for debugging
 test_rng = np.random.default_rng(42)
 
 
@@ -122,26 +128,28 @@ def main():
     for config_kan in ParameterGrid(grid):
 
         count += 1
-        # print(config_kan)
+        print("hp config")
+        print(*config_kan.items(), sep="\n")
         config_kan["structure_steps"] = max(
             1, int(config_kan["structure_steps"] * scale_steps)
         )
         config_kan["symbolification_steps"] = max(
             1, int(config_kan["symbolification_steps"] * scale_steps)
         )
-        if count == 1:
-            continue
+
+        if count > 1:
+            break
         for multiplication in c_multiplication:
             for prior_knowledge in c_prior_knowledge:
-                if prior_knowledge and (not multiplication) and (count == 2):
-                    continue
+                """if prior_knowledge and (not multiplication) and (count == 2):
+                continue"""
                 for linear_transformations in c_linear_transformations:
                     # k=0 should be trivial
                     for k in range(1, 4):  # 5):
                         # all_failed=False
                         all_failed = True
                         for n_v in range(1, 4):
-                            # no mult between at least two independent variables
+                            # mult only meaningful between at least two independent variables
                             if multiplication and (n_v == 1):
                                 continue
                             for seed in range(3):
@@ -168,19 +176,51 @@ def main():
                                     if (count==1) and (k==2) and (n_v==1):
                                         continue"""
                                     # for continuing when interrupted, or replicating single runs
+                                    """
+                                    --------------------Results_KAN/mult_False-prior_True-lin_False/k_1-nv_2-comb_3-seed_0.json--------------------
+                                    Grid Condition 1 out of 256
+                                    """
 
                                     params = {
-                                        #'k': 2,
                                         "multiplication": False,
-                                        "prior_knowledge": False,
-                                        "linear_transformations": True,
-                                        # "n_v": 2,
-                                        # "combination":1,
-                                        # "seed":2,
+                                        "prior_knowledge": True,
+                                        "linear_transformations": False,
+                                        "k": 1,
+                                        "n_v": 2,
+                                        "combination": 3,
+                                        "seed": 0,
+                                        "count": 1,
                                     }
                                     local_vars = locals()
 
-                                    if (count == 2) and all(
+                                    # print([local_vars[key] for key in params.keys()])
+                                    """if multiplication == True:
+                                        continue
+                                    if prior_knowledge == True:
+                                        continue
+                                    if linear_transformations == False:
+                                        continue
+                                    if n_v < 2:
+                                        continue"""
+
+                                    if all(
+                                        list(
+                                            local_vars[key] == val
+                                            for key, val in params.items()
+                                        )
+                                    ):
+                                        pass
+                                    else:
+                                        all_failed = False
+                                        """print(
+                                            {
+                                                key: local_vars[key] == val
+                                                for key, val in params.items()
+                                            }
+                                        )"""
+                                        continue
+
+                                    """if (count == 2) and all(
                                         list(
                                             local_vars[key] == val
                                             for key, val in params.items()
@@ -196,7 +236,7 @@ def main():
                                             (k == 2) and (n_v == 2) and combination < 1
                                         ):
                                             all_failed = False
-                                            continue
+                                            continue"""
                                     # print(*list((str(key),local_vars[key]) for key, _ in params.items()),sep="\n")
                                     # count+=1
                                     """if not(linear_transformations) and not(multiplication):
@@ -219,6 +259,17 @@ def main():
                                     if k == 0 and (combination > 0):
                                         continue
                                     for size in (1, 2, max(n_v, 3)):
+                                        # here
+                                        if size < 3:
+                                            continue
+                                        log_file = (
+                                            Path(str(path)[:-5]) / f"size{size}.log"
+                                        )
+                                        configure_logging(
+                                            log_file,
+                                            level=log_level,
+                                            overwrite=overwrite_log,
+                                        )
 
                                         # config
                                         if size in (1, 2, 3):
@@ -453,7 +504,7 @@ def main():
                             break
 
     # print(count)
-    print(path)
+    # print(path)
 
 
 if __name__ == "__main__":

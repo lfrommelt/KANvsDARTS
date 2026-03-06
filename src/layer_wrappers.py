@@ -290,3 +290,49 @@ class SymbolicKANLayerPlus(Symbolic_KANLayer):
         y = torch.sum(postacts, dim=2)
 
         return y, postacts
+
+    def single_forward(self, receiving, sending, x):
+        """
+        Forward through a single edge, can be usefull for symbolic interpretation and debugging.
+
+        :param self: Description
+        :param receiving: Index of the node in layer l+1, awkwardly named i
+        :param sending: Index of the node in layer l, awkwardly named j
+        :param x: usually sympy expression, but could also be float or tensor/array that can be brodcast to zero dim
+        """
+        j = sending
+        i = receiving
+        if isinstance(self.funs_name[j][i], str):
+            y = (
+                self.affine[j, i, 0]
+                * self.funs_sympy[j][i](self.affine[j, i, 1] * x + self.affine[j, i, 2])
+                + self.affine[j, i, 3]
+            )
+            # print("xij (str)", xij[:3])
+            # print("xij (str)", xij.shape)
+        elif isinstance(self.funs_name[j][i], tuple):
+            # inner
+            # print("input:", x[:,[i]][:3])
+            x_ = (
+                self.affine[j, i, 1]
+                * self.funs_sympy[j][i][1](
+                    self.affine[j, i, 2] * x + self.affine[j, i, 3]
+                )
+                + self.affine[j, i, 4]
+            )
+            # print("inner (tuple)", x_[:3])
+            # print("inner (tuple)", x_.shape)
+            # outer
+            # print(f"{self.affine[j,i,0]}*{self.funs_name[j][i][1]}({x_[:3]})+{self.affine[j,i,5]}")
+            # print(f"{self.affine[j,i,0]}*{self.funs[j][i][1](x_)[:3]}+{self.affine[j,i,5]}")
+            y = (
+                self.affine[j, i, 0] * self.funs_sympy[j][i][0](x_)
+                + self.affine[j, i, 5]
+            )
+            # print("outer (tuple)", xij[:3])
+            # print("outer (tuple)", xij.shape)
+        else:
+            raise ValueError(
+                f"Fun name should ot be {type(self.funs_name[j][i])}\n{self.funs_name[j][i]}"
+            )
+        return y

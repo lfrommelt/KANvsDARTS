@@ -13,3 +13,9 @@ Results*
 *.json
 datasets/*
 test*
+ldd
+outputs/*
+# Ignore all notebooks...
+*.ipynb
+# ...except this one:
+!datasets.ipynb

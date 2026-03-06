@@ -376,8 +376,8 @@ def round_and_simplify(expr, ndigits=1):
     return simplify(rounded)
 
 
-x_1, x_2, x_3 = sp.symbols("x_1 x_2 x_3")
-_ALLOWED = [x_1, x_2, x_3]
+x_1, x_2, x_3, x0, x1, x2 = sp.symbols("x_1 x_2 x_3 x0 x1 x2")
+_ALLOWED = [x_1, x_2, x_3, x0, x1, x2]
 
 '''def make_vectorized(expr, inputs=None):
     """
@@ -1760,7 +1760,7 @@ def sympy_to_dataset(eq, n=1000, seed=42, domain=(-1.0, 1.0), sampling="uniform"
     Y = fnum(*[X[:, i] for i in range(len(vars_sorted))])
     Y = np.array(Y)
     # Find non-nan evaluations
-    valid_mask = ~np.isnan(Y)
+    valid_mask = ~(np.isnan(Y) | np.isinf(Y))
     valid_X = X[valid_mask]
     valid_Y = Y[valid_mask][:, None]
     if valid_X.shape[0] < n:
@@ -2154,5 +2154,5 @@ class NumericTensorJSONEncoder(json.JSONEncoder):
                 return t.numpy().astype(str).tolist()
             return t.tolist()
 
-        # -------- Fallback: use the base class -----------------------------
-        return super().default(obj)
+        # -------- Fallback: use string representation -----------------------------
+        return str(obj)  # super().default(obj)

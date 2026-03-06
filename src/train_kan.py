@@ -47,11 +47,12 @@ def train_kan(config, dataset, tolerance=0.9):
         auto_save=True,
         first_init=True,
         ckpt_path="./model",
-        state_id=0,
-        round=0,
+        # state_id=0,
+        # round=0,
         device="cpu",
         real_affine_trainable=0.0,
     )
+    # todo: tolerance gotta be normal hp in config
     eps = 1e-10
     ## Structure Phase
     lt = np.inf
@@ -117,17 +118,19 @@ def train_kan(config, dataset, tolerance=0.9):
         if check is None:
             logger.info("Cannot prune further")
             break
-        logger.info(
-            f"Next pruning iteration if not {lt_1} * {tolerance} > {lt} = {not(lt_1 * tolerance > lt)}"
-        )
         # model.plot()
         # plt.show()
 
         lt_1 = logs[-1]["test_loss"][-1]
+        logger.info(
+            f"Next pruning iteration if not ({lt_1} * {tolerance} > {lt}) ({not(lt_1 * tolerance > lt)})"
+        )
     outcome = [steps]
 
     logger.info(f"Rewinding to {checkpoint}")
     model = model.rewind(checkpoint)
+    logger.info(f"KAN after rewind:")
+    model.log_self()
 
     steps = 0
     ## Symbolification Phase
@@ -221,5 +224,10 @@ def train_kan(config, dataset, tolerance=0.9):
         for key in logs[0]  # assume at least one dict
     }
 
+    logger.info(f"\nKAN prediction:\n\n{predicted_equation}\n")
+    logger.info(f"With architecture:")
+    model.log_self(symbolic=True, sparsity=False)
     monitor = SimpleNamespace(**log)
+    logger.info("\n")
+    model.log_self(symbolic=True, sparsity=True)
     return monitor, model, predicted_equation, outcome

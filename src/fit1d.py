@@ -7,6 +7,9 @@ from numpy.linalg import svd
 from scipy.optimize import minimize, least_squares
 import sympy
 import torch
+import logging
+
+logger = logging.getLogger()
 
 N_RESTARTS = 5
 
@@ -1863,7 +1866,7 @@ def fit_single(fun_name, x, y, n_restarts=5, method="lbfgs", true_params=None):
                 return np.array([1, 1, 1, 0, 0, 0]), np.inf
 
     best_mse = np.inf
-    best_pars = np.ones(6)
+    best_pars = np.array([1, 1, 1, 0, 0, 0])
     fit_fun = SOLO_ROUTINE[fun_name]
 
     for seed in range(n_restarts):
@@ -1876,6 +1879,7 @@ def fit_single(fun_name, x, y, n_restarts=5, method="lbfgs", true_params=None):
 
         except Exception as e:
             traceback.print_exc()
+            logger.exception(e)
             pass  # choose canonical raw form
     return (
         best_pars,

@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 # import kan
 
+# wtf is this line? since when am I doing unspecific imports?
 from kan.LBFGS import *
 
 mult_mod = importlib.import_module("kan.MultKAN")
@@ -26,6 +27,21 @@ logger = logging.getLogger(__name__)
 mult_mod.Symbolic_KANLayer = SymbolicKANLayerPlus
 OriginalMultKAN = mult_mod.MultKAN
 
+import yaml
+
+
+# yamls for iKAN need to safe tuples of primitives, so here is the rule for safely deserialization
+def construct_python_tuple(loader, node):
+    return tuple(loader.construct_sequence(node))
+
+
+yaml.add_constructor(
+    "tag:yaml.org,2002:python/tuple", construct_python_tuple, Loader=yaml.SafeLoader
+)
+
+overall_symbol_lib = SYMBOLIC_LIB | SYMBOLIC_TUPLE_LIB
+mult_mod.SYMBOLIC_LIB = overall_symbol_lib
+
 
 class KAN_SR(OriginalMultKAN):
     """
@@ -34,6 +50,8 @@ class KAN_SR(OriginalMultKAN):
     algortihm in the ways which are presented in the thesis.
     The class is still pretty redundant with respect to its parent.
     """
+
+    seed = 42
 
     def __init__(self, width, real_affine_trainable=False, **kwargs):
         mult_mod.MultKAN = OriginalMultKAN
@@ -50,26 +68,156 @@ class KAN_SR(OriginalMultKAN):
             self.shuffling_rng = np.random.default_rng(seed)
         logger.info(f"KAN at init:")
         self.log_self()
+        self._state_id = 0
+
+    # overwrite state_id because a string is set to it somewhere in the kan library
+    @property
+    def state_id(self):
+        return self._state_id
+
+    @state_id.setter
+    def state_id(self, val):
+        self._state_id = int(val)
+
+    def rewind(self, model_id):
+        model = super().rewind(model_id)
+        model.state_id = int(self.state_id)
+        return model
 
     @classmethod
     def set_seed(cls, value):
         cls.seed = value
 
-    def log_self(self, exhaustive=True):
+    def log_self(self, sparsity=True, symbolic=False, col_width=6):
+        """
+        Log information about the layered DAG.
 
-        description = f"----------\nshape: {self.width}"
-        description += "\nmask:"
-        for layer in range(self.depth):
-            description += f"\n{self.act_fun[layer].mask.numpy()}"
-        logger.info(description)
-        description = ""
-        if not (self.edge_scores is None):
-            description += "\nscores:"
+        Parameters
+        ----------
+        sparsity : bool
+            If True, also log the masks and (if available) the edge scores.
+        symbolic : bool
+            If True, log the symbolic functions.
+        col_width : int
+            Width (in characters) used for each entry when matrices are printed.
+        """
+
+        # ------------------------------------------------------------------
+        # Helper for printing any 2-D “matrix like” object on ONE line
+        # ------------------------------------------------------------------
+        def to_matrix_str(mat, align=False):
+            """
+            Parameters
+            ----------
+            mat : 2-D torch.Tensor | np.ndarray | list[list]
+            align : bool
+                If True each entry is padded so that every column has the same
+                width `col_width`.
+
+            Returns
+            -------
+            str
+                A single-line string that looks like a nested Python list:
+                '[[0.0, 1.0], [1.0, 0.0]]'
+            """
+            # Convert to nested python list of plain scalars
+            if isinstance(mat, torch.Tensor):
+                mat = mat.detach().cpu().numpy()
+            if isinstance(mat, np.ndarray):
+                mat = mat.tolist()  # -> list of lists
+
+            if not align:
+                return str(mat)
+
+            # -- aligned output ---------------------------------------------
+            def fmt(x):
+                # Try to keep ints as ints, otherwise use float with 4 dec.
+                if isinstance(x, (int, np.integer)):
+                    return f"{x:{col_width}d}"
+                else:
+                    return f"{x:{col_width}.4f}"
+
+            out_rows = []
+            for row in mat:
+                row_str = ", ".join(fmt(v) for v in row)
+                out_rows.append(f"[{row_str}]")
+            return "[" + ", ".join(out_rows) + "]"
+
+        # ------------------------------------------------------------------
+
+        log_lines = []
+        log_lines.append("----------")
+        log_lines.append(f"shape: {self.width}")
+
+        # --------------------------- MASK ---------------------------------
+        if sparsity:
+            log_lines.append("\nmask:")
             for layer in range(self.depth):
-                description += f"\n{self.edge_scores[layer]}"
-            logger.debug(description)
-        logger.info("\n----------")
-        return description
+                mask_str = to_matrix_str(self.act_fun[layer].mask.int(), align=True)
+                log_lines.append(mask_str)
+
+            # ------------------------ SCORES ------------------------------
+            if self.edge_scores is not None:
+                log_lines.append("\nscores:")
+                for layer in range(self.depth):
+                    scores = self.edge_scores[layer]
+
+                    # Make sure the orientation matches the mask:
+                    # (rows: senders, cols: receivers)
+                    if scores.shape != self.act_fun[layer].mask.shape:
+                        scores = scores.t()  # flip axes if needed
+
+                    scores_str = to_matrix_str(scores, align=True)
+                    log_lines.append(scores_str)
+
+        # ---------------------- SYMBOLIC FUNS ------------------------------
+        if symbolic:
+            log_lines.append("\nsymbolic functions:")
+            x = sympy.symbols("x")
+            for layer in range(self.depth):
+                fun_mat = [
+                    [
+                        self.symbolic_fun[layer].single_forward(
+                            receiving=i, sending=j, x=x
+                        )
+                        for j in range(self.width[layer + 1][0])
+                    ]
+                    for i in range(self.width[layer][0])
+                ]
+                log_lines.append(str(fun_mat))
+
+        log_lines.append("----------")
+
+        # Actually write the message
+        logger.info("\n".join(log_lines))
+
+    def _log_self(self, sparsity=True, symbolic=False):
+        # obsolete version?
+        description = f"----------\nshape: {self.width}"
+        if sparsity:
+            description += "\nmask:"
+            for layer in range(self.depth):
+                description += f"\n{self.act_fun[layer].mask.numpy()}"
+            logger.info(description)
+            description = ""
+            if not (self.edge_scores is None):
+                description += "\nscores:"
+                for layer in range(self.depth):
+                    description += f"\n{self.edge_scores[layer]}"
+        logger.info(description)
+        if symbolic:
+            description = "\nsymbolic functions:"
+            for layer in range(self.depth):
+                # description += f"\n{self.symbolic_fun[layer].mask.numpy()}"
+                x = sympy.symbols("x")
+                # affines=
+                description += f"\n{[[self.symbolic_fun[layer].funs_sympy[j][i](x) for j in range(self.width[layer+1][0])] for i in range(self.width[layer][0])]}"
+                # x = sympy.Array([[sympy.symbols("x")]])
+                # description += f"\n{self.symbolic_fun[layer](x)[1]}"
+
+            logger.info(description)
+
+        logger.info("----------")
 
     def fit(
         self,
@@ -757,8 +905,11 @@ class KAN_SR(OriginalMultKAN):
                 # no pruning if only one node remains
                 if self.act_fun[layer].mask.data.bool().sum().item() > 1:
                     # reset threshold if the min thresh would otherwise kill layer (highly unlikely)
-                    if minimal_edge >= sorted(self.edge_scores[layer].view(-1))[0]:
+                    if sorted(self.edge_scores[layer].view(-1))[-1] <= minimal_edge:
                         specific_thresh = sorted(self.edge_scores[layer].view(-1))[1]
+                        logger.debug(
+                            f"Resetting thresh because largest edge score {sorted(self.edge_scores[layer].view(-1))[-1]} is lower than min thresh {min_thresh}"
+                        )
                     else:
                         specific_thresh = minimal_edge
                     logger.debug(

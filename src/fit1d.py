@@ -1419,7 +1419,9 @@ def fit_stacked(fun_name, x, y, n_restarts=N_RESTARTS, solver_dict=None, fit_dic
 
         except Exception as e:
             # So far encountered np.LinalgError and type error
-            traceback.print_exc()
+            #traceback.print_exc()
+            logger.warning(f"fitting {outer} produced an error at retry {seed}:")
+            logger.warning(e)
 
     """if fun_name == ("exp", "sin"):
         plt.scatter(x, y, label="true")
@@ -1862,7 +1864,9 @@ def fit_single(fun_name, x, y, n_restarts=5, method="lbfgs", true_params=None):
             # try one more time
             try:
                 return fit_linear_map(42 + 1, x, y, true_params)
-            except np.linalg.LinAlgError:
+            except np.linalg.LinAlgError as e:
+                logger.warning(f"Fitting linear produced an error, using default values")
+                logger.warning(e)
                 return np.array([1, 1, 1, 0, 0, 0]), np.inf
 
     best_mse = np.inf
@@ -1878,8 +1882,9 @@ def fit_single(fun_name, x, y, n_restarts=5, method="lbfgs", true_params=None):
                 rel_mse_ext = res["rel_mse_ext"]
 
         except Exception as e:
-            traceback.print_exc()
-            logger.exception(e)
+            #traceback.print_exc()
+            logger.warning(f"Fitting {fun_name} produced an error in iteration {seed}:")
+            logger.warning(e)
             pass  # choose canonical raw form
     return (
         best_pars,

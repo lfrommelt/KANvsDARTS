@@ -1066,7 +1066,7 @@ class KAN_SR(OriginalMultKAN):
             if sum(self.act_fun[layer].mask.data.view(-1)) < 2:
                 continue
             else:
-                specific_thresh = min
+                #specific_thresh = min
                 # self.act_fun[i].mask.data = ((self.acts_scale[i] > threshold).permute(1,0)).float()
                 old_mask = self.act_fun[layer].mask.data
                 self.act_fun[layer].mask.data = (
@@ -1109,7 +1109,7 @@ class KAN_SR(OriginalMultKAN):
             weight_simple : float
                 a weight that prioritizies simplicity (low complexity) over performance (high r2) - set to 0.0 to ignore complexity
             r2_threshold : float
-                If r2 is below this threshold, the edge will not be fixed with any symbolic function - set to 0.0 to ignore this threshold
+                If loss? is below this threshold, the edge will not be fixed with any symbolic function - set to 0.0 to ignore this threshold
         Returns:
         --------
             None

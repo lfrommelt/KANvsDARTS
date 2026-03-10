@@ -37,7 +37,7 @@ class DebugOnlyFormatter(logging.Formatter):
         return super().format(record)
 
 
-def configure_logging(log_file, level=logging.INFO, overwrite=False):
+def configure_logging(log_file, level=logging.INFO, overwrite=False, log_to_console=False):
     """
     Configure global logging to write into `log_file`.
 
@@ -68,11 +68,12 @@ def configure_logging(log_file, level=logging.INFO, overwrite=False):
         default_fmt="%(message)s",  # for INFO+
     )
 
-    """# Console handler (optional)
-    console = logging.StreamHandler()
-    console.setLevel(level)
-    console.setFormatter(formatter)
-    root.addHandler(console)"""
+    if log_to_console:
+        # Console handler (optional)
+        console = logging.StreamHandler()
+        console.setLevel(level)
+        console.setFormatter(formatter)
+        root.addHandler(console)
 
     # File handler
     mode = "w" if overwrite else "a"

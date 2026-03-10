@@ -195,7 +195,6 @@ def main():
                                             equations = [line.rstrip() for line in f]
                                     except FileNotFoundError:
                                         # some samples were rejected
-                                        all_failed=False
                                         continue
 
                                     for combination in range(5):

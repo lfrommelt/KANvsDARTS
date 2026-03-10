@@ -185,12 +185,16 @@ def main():
                                 dataset_folder = Path(
                                     f"datasets/mult_{multiplication}-lin_{linear_transformations}"
                                 )
-                                with open(
-                                    dataset_folder / f"equations_k{k}_nv{n_v}.txt",
-                                    "rt",
-                                ) as f:
-                                    equations = [line.rstrip() for line in f]
 
+                                try:
+                                    with open(
+                                        dataset_folder / f"equations_k{k}_nv{n_v}.txt",
+                                        "rt",
+                                    ) as f:
+                                        equations = [line.rstrip() for line in f]
+                                except FileNotFoundError:
+                                    # some samples were rejected...
+                                    continue
                                 for combination in range(5):
                                     # failed at
                                     # Results_KAN/mult_False-prior_False-lin_True/k_2-nv_2-comb_1-seed_0.json--------------------

@@ -195,6 +195,7 @@ def main():
                                             equations = [line.rstrip() for line in f]
                                     except FileNotFoundError:
                                         # some samples were rejected
+                                        # should still not raise error here already
                                         continue
 
                                     for combination in range(5):
@@ -357,9 +358,12 @@ def main():
                                             dataset_path = (
                                                 dataset_folder / config["dataset"]
                                             )
-                                            with open(dataset_path, "rb") as f:
-                                                dataset = pickle.load(f)
-
+                                            try:
+                                                with open(dataset_path, "rb") as f:
+                                                    dataset = pickle.load(f)
+                                            except FileNotFoundError:
+                                                # some samples were rejected...
+                                                continue
                                             test_idx = np.random.choice(
                                                 np.arange(len(dataset["train_input"])),
                                                 size=config["val_size"],

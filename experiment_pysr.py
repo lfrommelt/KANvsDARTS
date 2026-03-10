@@ -194,6 +194,7 @@ def main():
                                         equations = [line.rstrip() for line in f]
                                 except FileNotFoundError:
                                     # some samples were rejected...
+                                    # wait, only some combinations
                                     continue
                                 for combination in range(5):
                                     # failed at
@@ -311,9 +312,12 @@ def main():
                                         dataset_folder
                                         / f"datasets_k{k}_nv{n_v}/{combination}.pkl"
                                     )
-                                    with open(dataset_path, "rb") as f:
-                                        dataset = pickle.load(f)
-
+                                    try:
+                                        with open(dataset_path, "rb") as f:
+                                            dataset = pickle.load(f)
+                                    except FileNotFoundError:
+                                        # some samples were rejected...
+                                        continue
                                     # print(dataset["train_input"].shape)
 
                                     print(

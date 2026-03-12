@@ -151,8 +151,8 @@ config = create_dict(
 
 # conditions
 c_multiplication = (False, True)
-c_prior_knowledge = (False,)  # (True, False)
-c_linear_transformations = (False, True)
+c_prior_knowledge = (True,)  # (True, False)
+c_linear_transformations = (True,)#, True)
 
 # for simulating results for debugging
 test_rng = np.random.default_rng(42)

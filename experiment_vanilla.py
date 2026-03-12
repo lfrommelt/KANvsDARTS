@@ -136,7 +136,7 @@ grid = {
 
 # conditions
 c_multiplication = (False, True)
-c_prior_knowledge = (False,)  # (True, False)
+c_prior_knowledge = (True,)  # (True, False)
 c_linear_transformations = (True,)# (False, True)
 
 # for simulating results for debugging (nicht implementiert oder was?)
@@ -197,7 +197,7 @@ def main():
                                         # some samples were rejected
                                         # should still not raise error here already
                                         continue
-
+                                    # why not 6????? cause up to four is enough
                                     for combination in range(5):
                                         '''overall+=1
                                         if not overall==random_start:
@@ -544,12 +544,13 @@ def main():
                                         grid_dict = config_kan.copy()
                                         grid_dict.pop("primitives")
                                         rootdir = Path(f"{folder}")
-                                        dirname = Path(
+                                        # there is no hp grid
+                                        '''dirname = Path(
                                             f"{'-'.join([str(key)+'_'+str(value) for key, value in grid_dict.items()])}"
-                                        )
+                                        )'''
                                         fullpath = (
                                             rootdir
-                                            / dirname
+                                            #/ dirname
                                             / f"mult_{multiplication}-prior_{prior_knowledge}-lin_{linear_transformations}/k_{k}-nv_{n_v}-comb_{combination}-seed_{seed}.json"
                                         )
                                         fullpath.parent.mkdir(

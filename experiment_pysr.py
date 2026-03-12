@@ -281,9 +281,9 @@ def main():
 
                                     actual_primitives = config["unary_operators"].copy()
 
-                                    # not supposed to happen in this setup
+                                    # not supposed to happen in this setup (yes it is, but its not debugged...)
                                     if prior_knowledge:
-                                        safdsfds
+                                        # safdsfds
                                         all_primitives = config["primitives"]
                                         actual_primitives = []
                                         for primitive in all_primitives:
